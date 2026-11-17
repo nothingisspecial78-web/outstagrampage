@@ -3,6 +3,7 @@ import cafe from "@/assets/pc-cafe.jpg";
 import garden from "@/assets/pc-garden.jpg";
 import books from "@/assets/pc-books.jpg";
 import pier from "@/assets/pc-pier.jpg";
+import { supabase, fetchLiveQuests, fetchLivePlaces, fetchLiveOffers } from "./supabase";
 
 export const MESSAGE_LIMIT_STEP = 20;
 
@@ -113,6 +114,24 @@ function useStoreState() {
     try { const c = localStorage.getItem("os-chats"); if (c) setChats(JSON.parse(c)); } catch {}
     try { if (localStorage.getItem("os-demo") === "1") setDemo(true); } catch {}
     setReady(true);
+
+    // Hydrate live data from Supabase if connected
+    Promise.all([fetchLiveQuests(), fetchLiveOffers()]).then(([qList, oList]) => {
+      if (qList && qList.length > 0) {
+        setQuests(qList.map((q: any) => q.title || q.description));
+      }
+      if (oList && oList.length > 0) {
+        setOffers(oList.map((o: any) => ({
+          id: o.id,
+          place: o.place_id || "Riverside Cafe",
+          partner: o.partner_name || "Partner",
+          text: o.description || o.title || "Special perk",
+          status: o.status || "live"
+        })));
+      }
+    }).catch((err) => {
+      console.warn("Supabase initial sync fallback:", err);
+    });
   }, []);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-demo", demo ? "1" : "0"); } catch {} } }, [demo, ready]);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-chats", JSON.stringify(chats)); } catch {} } }, [chats, ready]);
