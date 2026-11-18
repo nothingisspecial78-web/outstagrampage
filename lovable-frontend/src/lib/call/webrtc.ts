@@ -1,33 +1,23 @@
 import { supabase } from "@/lib/supabase";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type CallType = "voice" | "video";
-export type CallStatus =
-  | "idle"
-  | "calling"
-  | "ringing"
-  | "connecting"
-  | "connected"
-  | "ended"
-  | "declined"
-  | "busy";
+export type CallStatus = "idle" | "calling" | "ringing" | "connecting" | "connected" | "ended";
 
 export interface CallPeerInfo {
   id: string;
   name: string;
-  handle?: string;
   avatar?: string;
 }
 
 export interface SignalingPayload {
+  type: "call-invite" | "call-accept" | "call-reject" | "call-end" | "ice-candidate";
   callId: string;
   chatId: string;
-  from: CallPeerInfo;
-  to?: CallPeerInfo;
-  type: CallType;
+  caller: CallPeerInfo;
+  target: CallPeerInfo;
+  callType: CallType;
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
-  reason?: string;
 }
 
 export const RTC_CONFIG: RTCConfiguration = {
@@ -41,104 +31,101 @@ export const RTC_CONFIG: RTCConfiguration = {
 export class WebRTCManager {
   private pc: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
-  private remoteStream: MediaStream | null = null;
-  private channel: RealtimeChannel | null = null;
-  private currentFacingMode: "user" | "environment" = "user";
-  private iceCandidateQueue: RTCIceCandidateInit[] = [];
-  private remoteDescSet = false;
+  private channelSubscription: any = null;
+  private facingMode: "user" | "environment" = "user";
 
   public onRemoteStream?: (stream: MediaStream) => void;
   public onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
-  public onSignalMessage?: (event: string, payload: SignalingPayload) => void;
+  public onIceCandidateGenerated?: (candidate: RTCIceCandidateInit) => void;
 
-  constructor() {
-    if (typeof window !== "undefined" && typeof MediaStream !== "undefined") {
-      this.remoteStream = new MediaStream();
-    }
+  public getPeerConnection(): RTCPeerConnection | null {
+    return this.pc;
   }
 
-  async getLocalMedia(type: CallType): Promise<MediaStream> {
-    if (this.localStream) {
-      this.stopLocalMedia();
-    }
+  public getLocalStream(): MediaStream | null {
+    return this.localStream;
+  }
 
-    const constraints: MediaStreamConstraints = {
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video:
-        type === "video"
+  // Acquire media tracks
+  async initLocalMedia(video = true): Promise<MediaStream> {
+    this.cleanupMedia();
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: video
           ? {
-              facingMode: this.currentFacingMode,
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
+              facingMode: this.facingMode,
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
             }
           : false,
-    };
+      };
 
-    try {
-      this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      return this.localStream;
-    } catch (err: any) {
-      console.warn("Media devices error, attempting audio-only fallback:", err);
-      if (type === "video") {
-        try {
-          this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-          return this.localStream;
-        } catch (audioErr) {
-          throw audioErr;
-        }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.localStream = stream;
+      return stream;
+    } catch (err) {
+      console.error("[WebRTC] Media access error:", err);
+      // Fallback to audio-only if video fails (e.g. no camera or blocked)
+      if (video) {
+        return this.initLocalMedia(false);
       }
       throw err;
     }
   }
 
-  createPeerConnection(
-    onIceCandidate: (candidate: RTCIceCandidateInit) => void
-  ): RTCPeerConnection {
+  // Flip camera between front and rear
+  async switchCamera(): Promise<MediaStream> {
+    this.facingMode = this.facingMode === "user" ? "environment" : "user";
+    const newStream = await this.initLocalMedia(true);
+
+    if (this.pc) {
+      const videoTrack = newStream.getVideoTracks()[0];
+      const senders = this.pc.getSenders();
+      const videoSender = senders.find((s) => s.track && s.track.kind === "video");
+      if (videoSender && videoTrack) {
+        await videoSender.replaceTrack(videoTrack);
+      }
+    }
+    return newStream;
+  }
+
+  // Initialize peer connection with standard event handlers
+  createPeerConnection(): RTCPeerConnection {
     if (this.pc) {
       this.pc.close();
-      this.pc = null;
-    }
-
-    this.remoteDescSet = false;
-    this.iceCandidateQueue = [];
-    if (typeof MediaStream !== "undefined") {
-      this.remoteStream = new MediaStream();
     }
 
     const pc = new RTCPeerConnection(RTC_CONFIG);
     this.pc = pc;
 
+    // Attach local tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
         pc.addTrack(track, this.localStream!);
       });
     }
 
+    // Handle remote tracks
     pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        event.streams[0].getTracks().forEach((track) => {
-          if (!this.remoteStream?.getTracks().some((t) => t.id === track.id)) {
-            this.remoteStream?.addTrack(track);
-          }
-        });
-      } else if (event.track) {
-        this.remoteStream?.addTrack(event.track);
-      }
-      if (this.onRemoteStream && this.remoteStream) {
-        this.onRemoteStream(this.remoteStream);
+      const [remoteStream] = event.streams;
+      if (remoteStream && this.onRemoteStream) {
+        this.onRemoteStream(remoteStream);
       }
     };
 
+    // Handle ICE candidates
     pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        onIceCandidate(event.candidate.toJSON());
+      if (event.candidate && this.onIceCandidateGenerated) {
+        this.onIceCandidateGenerated(event.candidate.toJSON());
       }
     };
 
+    // Connection state changes
     pc.onconnectionstatechange = () => {
       if (this.onConnectionStateChange) {
         this.onConnectionStateChange(pc.connectionState);
@@ -148,212 +135,114 @@ export class WebRTCManager {
     return pc;
   }
 
+  // Create WebRTC Offer
   async createOffer(): Promise<RTCSessionDescriptionInit> {
-    if (!this.pc) throw new Error("RTCPeerConnection not initialized");
-    const offer = await this.pc.createOffer({
+    const pc = this.createPeerConnection();
+    const offer = await pc.createOffer({
       offerToReceiveAudio: true,
       offerToReceiveVideo: true,
     });
-    await this.pc.setLocalDescription(offer);
+    await pc.setLocalDescription(offer);
     return offer;
   }
 
+  // Handle incoming Offer and create Answer
   async handleOffer(offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
-    if (!this.pc) throw new Error("RTCPeerConnection not initialized");
-    await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
-    this.remoteDescSet = true;
-    await this.processQueuedCandidates();
-
-    const answer = await this.pc.createAnswer();
-    await this.pc.setLocalDescription(answer);
+    const pc = this.createPeerConnection();
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
     return answer;
   }
 
+  // Handle Answer from peer
   async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
     if (!this.pc) return;
     await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
-    this.remoteDescSet = true;
-    await this.processQueuedCandidates();
   }
 
-  async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
-    if (!this.pc || !this.remoteDescSet) {
-      this.iceCandidateQueue.push(candidate);
-      return;
-    }
+  // Add ICE candidate
+  async handleIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+    if (!this.pc) return;
     try {
       await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (e) {
-      console.warn("Failed to add ICE candidate:", e);
+      console.warn("[WebRTC] ICE candidate error:", e);
     }
   }
 
-  private async processQueuedCandidates(): Promise<void> {
-    if (!this.pc) return;
-    while (this.iceCandidateQueue.length > 0) {
-      const candidate = this.iceCandidateQueue.shift();
-      if (candidate) {
-        try {
-          await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.warn("Failed to add queued candidate:", e);
-        }
-      }
-    }
-  }
-
-  toggleAudio(enabled?: boolean): boolean {
+  // Toggle local microphone track
+  toggleAudio(): boolean {
     if (!this.localStream) return false;
-    const tracks = this.localStream.getAudioTracks();
-    const newState = enabled !== undefined ? enabled : !tracks[0]?.enabled;
-    tracks.forEach((track) => {
-      track.enabled = newState;
-    });
-    return newState;
-  }
-
-  toggleVideo(enabled?: boolean): boolean {
-    if (!this.localStream) return false;
-    const tracks = this.localStream.getVideoTracks();
-    const newState = enabled !== undefined ? enabled : !tracks[0]?.enabled;
-    tracks.forEach((track) => {
-      track.enabled = newState;
-    });
-    return newState;
-  }
-
-  async switchCamera(): Promise<MediaStream | null> {
-    if (!this.localStream) return null;
-    this.currentFacingMode = this.currentFacingMode === "user" ? "environment" : "user";
-
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: this.currentFacingMode },
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      if (!newVideoTrack) return this.localStream;
-
-      const oldVideoTrack = this.localStream.getVideoTracks()[0];
-      if (oldVideoTrack) {
-        this.localStream.removeTrack(oldVideoTrack);
-        oldVideoTrack.stop();
-      }
-      this.localStream.addTrack(newVideoTrack);
-
-      if (this.pc) {
-        const senders = this.pc.getSenders();
-        const videoSender = senders.find((s) => s.track?.kind === "video");
-        if (videoSender) {
-          await videoSender.replaceTrack(newVideoTrack);
-        }
-      }
-      return this.localStream;
-    } catch (err) {
-      console.warn("Failed to switch camera:", err);
-      return this.localStream;
+    const audioTrack = this.localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      return audioTrack.enabled;
     }
+    return false;
   }
 
-  subscribeSignaling(
-    chatId: string,
-    onSignal: (event: string, payload: SignalingPayload) => void
-  ): RealtimeChannel {
-    this.unsubscribeSignaling();
-
-    const channelName = `call_${chatId}`;
-    const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: false } },
-    });
-
-    const signalEvents = [
-      "call_invite",
-      "call_accept",
-      "call_reject",
-      "call_end",
-      "webrtc_offer",
-      "webrtc_answer",
-      "webrtc_ice_candidate",
-    ];
-
-    signalEvents.forEach((eventName) => {
-      channel.on("broadcast", { event: eventName }, ({ payload }) => {
-        onSignal(eventName, payload as SignalingPayload);
-      });
-    });
-
-    channel.subscribe((status) => {
-      console.log(`[WebRTC] Channel ${channelName} status:`, status);
-    });
-
-    this.channel = channel;
-    return channel;
+  // Toggle local video track
+  toggleVideo(): boolean {
+    if (!this.localStream) return false;
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      return videoTrack.enabled;
+    }
+    return false;
   }
 
-  async sendSignal(event: string, payload: SignalingPayload): Promise<void> {
-    if (!this.channel) return;
+  // Send signaling event over Supabase Realtime broadcast
+  async sendSignal(payload: SignalingPayload): Promise<void> {
     try {
-      await this.channel.send({
+      const channelName = `call_channel_${payload.chatId}`;
+      const channel = supabase.channel(channelName);
+      await channel.subscribe();
+      await channel.send({
         type: "broadcast",
-        event,
+        event: "webrtc_signal",
         payload,
       });
     } catch (err) {
-      console.warn(`[WebRTC] Error sending signal ${event}:`, err);
+      console.error("[WebRTC] Failed to send signal:", err);
     }
   }
 
-  unsubscribeSignaling(): void {
-    if (this.channel) {
-      try {
-        supabase.removeChannel(this.channel);
-      } catch (e) {}
-      this.channel = null;
+  // Listen to signaling events on chat channel
+  listenSignaling(chatId: string, onSignal: (payload: SignalingPayload) => void) {
+    if (this.channelSubscription) {
+      this.channelSubscription.unsubscribe();
     }
+    const channelName = `call_channel_${chatId}`;
+    this.channelSubscription = supabase
+      .channel(channelName)
+      .on("broadcast", { event: "webrtc_signal" }, (event: any) => {
+        if (event.payload) {
+          onSignal(event.payload);
+        }
+      })
+      .subscribe();
   }
 
-  stopLocalMedia(): void {
-    if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
-        try {
-          track.stop();
-        } catch {}
-      });
-      this.localStream = null;
-    }
-  }
-
-  cleanup(): void {
-    this.stopLocalMedia();
-    if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach((track) => {
-        try {
-          track.stop();
-        } catch {}
-      });
-      this.remoteStream = null;
-    }
+  // Cleanup all media and connections
+  cleanup() {
+    this.cleanupMedia();
     if (this.pc) {
-      try {
-        this.pc.close();
-      } catch {}
+      this.pc.close();
       this.pc = null;
     }
-    this.remoteDescSet = false;
-    this.iceCandidateQueue = [];
-    this.unsubscribeSignaling();
+    if (this.channelSubscription) {
+      this.channelSubscription.unsubscribe();
+      this.channelSubscription = null;
+    }
   }
 
-  getLocalStream(): MediaStream | null {
-    return this.localStream;
-  }
-
-  getRemoteStream(): MediaStream | null {
-    return this.remoteStream;
-  }
-
-  getPeerConnection(): RTCPeerConnection | null {
-    return this.pc;
+  private cleanupMedia() {
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream = null;
+    }
   }
 }
 

@@ -52,12 +52,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const autoConnectTimerRef = useRef<number | null>(null);
   const callStartTimeRef = useRef<number | null>(null);
 
+  // Self identity
   const currentSelf: CallPeerInfo = {
     id: session?.email || "self_user",
     name: session?.name || "Sam Okafor",
     avatar: "",
   };
 
+  // Keep remote stream updated
   useEffect(() => {
     webrtc.onRemoteStream = (stream) => {
       setRemoteStream(typeof MediaStream !== "undefined" ? new MediaStream(stream.getTracks()) : stream);
@@ -82,6 +84,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Duration counter when connected
   useEffect(() => {
     if (status === "connected") {
       callStartTimeRef.current = Date.now();
@@ -95,126 +98,17 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         durationTimerRef.current = null;
       }
     }
-
     return () => {
       if (durationTimerRef.current !== null) {
         clearInterval(durationTimerRef.current);
-        durationTimerRef.current = null;
       }
     };
   }, [status]);
 
-  const handleSignal = useCallback(
-    async (event: string, payload: SignalingPayload) => {
-      console.log(`[WebRTC] Received signal: ${event}`, payload);
-
-      if (event === "call_invite") {
-        if (status !== "idle") {
-          await webrtc.sendSignal("call_reject", {
-            ...payload,
-            from: currentSelf,
-            reason: "busy",
-          });
-          return;
-        }
-
-        setIncomingCall(payload);
-        callSounds.startIncomingRingtone();
-        return;
-      }
-
-      if (callId && payload.callId !== callId) return;
-
-      if (event === "call_accept") {
-        callSounds.stopRingtone();
-        if (autoConnectTimerRef.current) {
-          clearTimeout(autoConnectTimerRef.current);
-          autoConnectTimerRef.current = null;
-        }
-
-        setStatus("connecting");
-        try {
-          const pc = webrtc.createPeerConnection((candidate) => {
-            webrtc.sendSignal("webrtc_ice_candidate", {
-              callId: payload.callId,
-              chatId: payload.chatId,
-              from: currentSelf,
-              type: payload.type,
-              candidate,
-            });
-          });
-
-          const offer = await webrtc.createOffer();
-          await webrtc.sendSignal("webrtc_offer", {
-            callId: payload.callId,
-            chatId: payload.chatId,
-            from: currentSelf,
-            type: payload.type,
-            sdp: offer,
-          });
-        } catch (err) {
-          console.error("Error creating WebRTC offer:", err);
-          toast.error("Failed to connect call");
-          endCall();
-        }
-      } else if (event === "webrtc_offer") {
-        try {
-          const answer = await webrtc.handleOffer(payload.sdp!);
-          await webrtc.sendSignal("webrtc_answer", {
-            callId: payload.callId,
-            chatId: payload.chatId,
-            from: currentSelf,
-            type: payload.type,
-            sdp: answer,
-          });
-          setStatus("connected");
-          callSounds.playConnectedTone();
-        } catch (err) {
-          console.error("Error handling WebRTC offer:", err);
-        }
-      } else if (event === "webrtc_answer") {
-        try {
-          await webrtc.handleAnswer(payload.sdp!);
-          setStatus("connected");
-          callSounds.playConnectedTone();
-        } catch (err) {
-          console.error("Error handling WebRTC answer:", err);
-        }
-      } else if (event === "webrtc_ice_candidate") {
-        if (payload.candidate) {
-          await webrtc.addIceCandidate(payload.candidate);
-        }
-      } else if (event === "call_reject") {
-        callSounds.stopRingtone();
-        callSounds.playEndTone();
-        toast.info(`${peer?.name || "User"} declined the call.`);
-        if (chatId) {
-          logCallEvent(chatId, callType, "declined");
-        }
-        cleanupCall();
-      } else if (event === "call_end") {
-        callSounds.stopRingtone();
-        callSounds.playEndTone();
-        toast.info("Call ended");
-        if (chatId && duration > 0) {
-          logCallEvent(chatId, callType, "completed", duration);
-        }
-        cleanupCall();
-      }
-    },
-    [status, callId, peer, chatId, callType, duration, currentSelf]
-  );
-
-  const activeChatId = chatId;
-  useEffect(() => {
-    if (activeChatId) {
-      webrtc.subscribeSignaling(activeChatId, handleSignal);
-    }
-  }, [activeChatId, handleSignal]);
-
+  // Start outgoing call
   const startCall = async (targetChatId: string, targetPeer: CallPeerInfo, type: CallType) => {
     try {
-      const newCallId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const newCallId = `call_${Date.now()}`;
       setChatId(targetChatId);
       setCallId(newCallId);
       setPeer(targetPeer);
@@ -223,169 +117,189 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setIsMuted(false);
       setIsCameraOff(false);
 
-      webrtc.subscribeSignaling(targetChatId, handleSignal);
-
-      const stream = await webrtc.getLocalMedia(type);
-      setLocalStream(stream);
-
       callSounds.startOutgoingRingtone();
 
-      await webrtc.sendSignal("call_invite", {
-        callId: newCallId,
-        chatId: targetChatId,
-        from: currentSelf,
-        to: targetPeer,
-        type,
-      });
-
-      autoConnectTimerRef.current = window.setTimeout(() => {
-        simulateAnswer();
-      }, 6000);
-    } catch (err: any) {
-      console.error("Failed to start call:", err);
-      toast.error(err.name === "NotAllowedError" ? "Camera/Microphone permission denied" : "Could not access media devices");
-      cleanupCall();
-    }
-  };
-
-  const acceptCall = async () => {
-    if (!incomingCall) return;
-    callSounds.stopRingtone();
-
-    const incoming = incomingCall;
-    setIncomingCall(null);
-    setChatId(incoming.chatId);
-    setCallId(incoming.callId);
-    setPeer(incoming.from);
-    setCallType(incoming.type);
-    setStatus("connecting");
-    setIsMuted(false);
-    setIsCameraOff(false);
-
-    try {
-      webrtc.subscribeSignaling(incoming.chatId, handleSignal);
-
-      const stream = await webrtc.getLocalMedia(incoming.type);
+      // Acquire media streams
+      const stream = await webrtc.initLocalMedia(type === "video");
       setLocalStream(stream);
 
-      webrtc.createPeerConnection((candidate) => {
-        webrtc.sendSignal("webrtc_ice_candidate", {
-          callId: incoming.callId,
-          chatId: incoming.chatId,
-          from: currentSelf,
-          type: incoming.type,
-          candidate,
-        });
+      // Listen for signaling in this chat channel
+      webrtc.listenSignaling(targetChatId, async (payload) => {
+        if (payload.callId !== newCallId && payload.type !== "call-reject") return;
+
+        if (payload.type === "call-accept") {
+          callSounds.stopRingtone();
+          setStatus("connecting");
+          // If remote sent an answer
+          if (payload.sdp) {
+            await webrtc.handleAnswer(payload.sdp);
+          }
+        } else if (payload.type === "call-reject") {
+          callSounds.stopRingtone();
+          callSounds.playEndTone();
+          toast.info(`${targetPeer.name} is busy`);
+          logCallEvent(targetChatId, type, "declined");
+          resetState();
+        } else if (payload.type === "call-end") {
+          callSounds.stopRingtone();
+          callSounds.playEndTone();
+          toast.info("Call ended");
+          logCallEvent(targetChatId, type, "completed", duration);
+          resetState();
+        } else if (payload.type === "ice-candidate" && payload.candidate) {
+          await webrtc.handleIceCandidate(payload.candidate);
+        }
       });
 
-      await webrtc.sendSignal("call_accept", {
-        callId: incoming.callId,
-        chatId: incoming.chatId,
-        from: currentSelf,
-        type: incoming.type,
+      // Create RTC offer
+      const offer = await webrtc.createOffer();
+
+      // Broadcast call invitation signal
+      await webrtc.sendSignal({
+        type: "call-invite",
+        callId: newCallId,
+        chatId: targetChatId,
+        caller: currentSelf,
+        target: targetPeer,
+        callType: type,
+        sdp: offer,
       });
+
+      // Simulation timeout fallback for demo/single-browser testing
+      // If no real peer responds within 8s, offer a simulated connection or ring until timeout
+      if (autoConnectTimerRef.current) clearTimeout(autoConnectTimerRef.current);
+      autoConnectTimerRef.current = window.setTimeout(() => {
+        if (status === "calling") {
+          // Provide gentle prompt or keep ringing
+          console.log("[WebRTC] Call ringing... Waiting for peer response.");
+        }
+      }, 8000);
     } catch (err: any) {
-      console.error("Failed to accept call:", err);
-      toast.error("Failed to access media devices");
-      cleanupCall();
+      console.error("[WebRTC] Failed to start call:", err);
+      callSounds.stopRingtone();
+      toast.error(err.message || "Could not access microphone or camera");
+      resetState();
     }
   };
 
+  // Answer incoming call
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+    try {
+      callSounds.stopRingtone();
+      setStatus("connecting");
+
+      const stream = await webrtc.initLocalMedia(incomingCall.callType === "video");
+      setLocalStream(stream);
+
+      if (incomingCall.sdp) {
+        const answer = await webrtc.handleOffer(incomingCall.sdp);
+        await webrtc.sendSignal({
+          type: "call-accept",
+          callId: incomingCall.callId,
+          chatId: incomingCall.chatId,
+          caller: incomingCall.caller,
+          target: currentSelf,
+          callType: incomingCall.callType,
+          sdp: answer,
+        });
+      }
+
+      setStatus("connected");
+      callSounds.playConnectedTone();
+    } catch (err: any) {
+      console.error("[WebRTC] Error answering call:", err);
+      toast.error("Could not connect call");
+      rejectCall();
+    }
+  };
+
+  // Reject incoming call
   const rejectCall = async (reason = "declined") => {
-    callSounds.stopRingtone();
     if (incomingCall) {
-      await webrtc.sendSignal("call_reject", {
-        ...incomingCall,
-        from: currentSelf,
-        reason,
+      callSounds.stopRingtone();
+      callSounds.playEndTone();
+      await webrtc.sendSignal({
+        type: "call-reject",
+        callId: incomingCall.callId,
+        chatId: incomingCall.chatId,
+        caller: incomingCall.caller,
+        target: currentSelf,
+        callType: incomingCall.callType,
       });
-      setIncomingCall(null);
+      logCallEvent(incomingCall.chatId, incomingCall.callType, "declined");
     }
-    cleanupCall();
+    resetState();
   };
 
-  const simulateAnswer = () => {
-    if (autoConnectTimerRef.current) {
-      clearTimeout(autoConnectTimerRef.current);
-      autoConnectTimerRef.current = null;
-    }
-    callSounds.stopRingtone();
-    setStatus("connected");
-    callSounds.playConnectedTone();
-
-    const currentLocal = webrtc.getLocalStream();
-    if (currentLocal) {
-      setRemoteStream(currentLocal);
-    }
-  };
-
+  // End active call
   const endCall = () => {
-    if (autoConnectTimerRef.current) {
-      clearTimeout(autoConnectTimerRef.current);
-      autoConnectTimerRef.current = null;
-    }
     callSounds.stopRingtone();
     callSounds.playEndTone();
 
-    if (callId && chatId) {
-      webrtc.sendSignal("call_end", {
+    if (chatId && callId && peer) {
+      webrtc.sendSignal({
+        type: "call-end",
         callId,
         chatId,
-        from: currentSelf,
-        type: callType,
+        caller: currentSelf,
+        target: peer,
+        callType,
       });
-
-      if (duration > 0) {
-        logCallEvent(chatId, callType, "completed", duration);
-      } else {
-        logCallEvent(chatId, callType, "missed");
-      }
+      logCallEvent(chatId, callType, "completed", duration);
     }
 
-    cleanupCall();
+    resetState();
   };
 
-  const cleanupCall = () => {
-    webrtc.cleanup();
-    callSounds.stopRingtone();
-    if (durationTimerRef.current !== null) {
-      clearInterval(durationTimerRef.current);
-      durationTimerRef.current = null;
+  // Toggle microphone
+  const toggleMic = () => {
+    const active = webrtc.toggleAudio();
+    setIsMuted(!active);
+  };
+
+  // Toggle camera
+  const toggleCamera = () => {
+    const active = webrtc.toggleVideo();
+    setIsCameraOff(!active);
+  };
+
+  // Switch camera between front and back
+  const switchCamera = async () => {
+    try {
+      const stream = await webrtc.switchCamera();
+      setLocalStream(stream);
+      setIsCameraOff(false);
+      toast.info("Camera flipped");
+    } catch {
+      toast.error("No alternative camera found");
     }
-    if (autoConnectTimerRef.current !== null) {
+  };
+
+  // Simulate remote answer for instant testing in demo mode
+  const simulateAnswer = () => {
+    callSounds.stopRingtone();
+    callSounds.playConnectedTone();
+    setStatus("connected");
+    toast.success("Call connected (simulation)");
+  };
+
+  const resetState = () => {
+    if (autoConnectTimerRef.current) {
       clearTimeout(autoConnectTimerRef.current);
       autoConnectTimerRef.current = null;
     }
+    webrtc.cleanup();
     setStatus("idle");
-    setPeer(null);
-    setCallId(null);
     setChatId(null);
+    setCallId(null);
+    setPeer(null);
+    setDuration(0);
     setLocalStream(null);
     setRemoteStream(null);
+    setIncomingCall(null);
     setIsMuted(false);
     setIsCameraOff(false);
-    setDuration(0);
-  };
-
-  const toggleMic = () => {
-    const newState = !isMuted;
-    const isAudioActive = !newState;
-    webrtc.toggleAudio(isAudioActive);
-    setIsMuted(newState);
-  };
-
-  const toggleCamera = () => {
-    const newState = !isCameraOff;
-    const isVideoActive = !newState;
-    webrtc.toggleVideo(isVideoActive);
-    setIsCameraOff(newState);
-  };
-
-  const switchCamera = async () => {
-    const newStream = await webrtc.switchCamera();
-    if (newStream) {
-      setLocalStream(new MediaStream(newStream.getTracks()));
-    }
   };
 
   return (
