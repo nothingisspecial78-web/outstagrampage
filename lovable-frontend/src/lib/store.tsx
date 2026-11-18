@@ -16,6 +16,7 @@ export type Msg = {
   text: string;
   audioUrl?: string;
   audioDuration?: number;
+  postcard?: Postcard;
   callRecord?: {
     type: "voice" | "video";
     status: "completed" | "missed" | "declined";
@@ -304,6 +305,46 @@ function useStoreState() {
     );
   };
 
+  const sendPostcardNote = (targetUser: string, noteText: string, postcard: Postcard) => {
+    const first = targetUser.split(" ")[0] ?? targetUser;
+    const chatId = first.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+    const newMsg: Msg = {
+      id: `m_note_${Date.now()}`,
+      mine: true,
+      text: noteText,
+      postcard: {
+        id: postcard.id,
+        from: postcard.from,
+        place: postcard.place,
+        date: postcard.date,
+        img: postcard.img,
+        caption: postcard.caption,
+      },
+    };
+
+    setChats((cs) => {
+      const exists = cs.some((c) => c.id === chatId);
+      if (exists) {
+        return cs.map((c) => (c.id === chatId ? { ...c, messages: [...c.messages, newMsg] } : c));
+      } else {
+        const newChat: Chat = {
+          id: chatId,
+          name: first,
+          place: postcard.place || "Somewhere nearby",
+          limit: MESSAGE_LIMIT_STEP,
+          messages: [
+            { id: `m_intro_${Date.now() - 100}`, mine: false, text: `Hi! Thanks for checking out my postcard from ${postcard.place}.` },
+            newMsg,
+          ],
+        };
+        return [newChat, ...cs];
+      }
+    });
+
+    return chatId;
+  };
+
   const unlockChat = (chatId: string) => {
     setChats((cs) => cs.map((c) => (c.id === chatId ? { ...c, limit: c.limit + MESSAGE_LIMIT_STEP } : c)));
     const chat = chats.find((c) => c.id === chatId);
@@ -383,7 +424,7 @@ function useStoreState() {
     signIn, signOut,
     setSession,
     addStamp,
-    addPostcard, logQuest, completeQuest, addCraft, sendMsg, send, sendVoice, logCallEvent, unlockChat, unlock, startChat,
+    addPostcard, logQuest, completeQuest, addCraft, sendMsg, send, sendVoice, sendPostcardNote, logCallEvent, unlockChat, unlock, startChat,
     groupStamp, useCoach, toggleDemo, markSeen, setSeen,
     resolveReport, reviewOffer, setMemberStatus, setMember, addQuest, removeQuest,
     capture: (place: string) => addStamp("place", place),

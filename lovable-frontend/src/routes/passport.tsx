@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   MapPin,
@@ -30,8 +30,22 @@ import {
   ShieldCheck,
   Clock,
   ArrowUpRight,
+  Plane,
+  Glasses,
+  Train,
+  TreePine,
+  Ticket,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  TICKET_PASSES,
+  DigitalTicketModal,
+  type TicketVoucher,
+  getIconForCategory,
+} from "@/components/hb/rewards/TicketPasses";
 import { Postmark } from "@/components/hb/Postmark";
 import { Avatar } from "@/components/hb/AppShell";
 import { RACK, useStore, type Stamp, PLACES_INFO } from "@/lib/store";
@@ -219,12 +233,74 @@ function MyProfile() {
     }
   }, [search.tab]);
   const [rewardFilter, setRewardFilter] = useState<"all" | "ready" | "challenges" | "meetups">("all");
-  const [withdrawModal, setWithdrawModal] = useState(false);
-  const [redeemModal, setRedeemModal] = useState<string | null>(null);
-  const [points, setPoints] = useState(1850);
-  const [payoutAmount, setPayoutAmount] = useState("18.50");
-  const [payoutMethod, setPayoutMethod] = useState<"bank" | "paypal" | "local">("bank");
-  const [payoutBusy, setPayoutBusy] = useState(false);
+  const [activeChallenges, setActiveChallenges] = useState<Record<string, number>>({
+    "lenskart-frame": 14200,
+    "flight-50": 31500,
+  });
+  const [claimedTicket, setClaimedTicket] = useState<TicketVoucher | null>(null);
+  const [points, setPoints] = useState(2850);
+  const [talkHours, setTalkHours] = useState(3.5);
+  const ticketTrackRef = useRef<HTMLDivElement>(null);
+
+  const scrollTicketPrev = () => {
+    if (ticketTrackRef.current) {
+      ticketTrackRef.current.scrollBy({ left: -320, behavior: "smooth" });
+    }
+  };
+
+  const scrollTicketNext = () => {
+    if (ticketTrackRef.current) {
+      ticketTrackRef.current.scrollBy({ left: 320, behavior: "smooth" });
+    }
+  };
+
+  const handleActivateChallenge = (t: TicketVoucher) => {
+    setActiveChallenges((prev) => ({
+      ...prev,
+      [t.id]: prev[t.id] !== undefined ? prev[t.id] : 0,
+    }));
+    toast.success(`Challenge Activated: ${t.title}`, {
+      description: `Target: ${t.targetAmount.toLocaleString()} ${t.unit}. Walk, explore & track your progress!`,
+    });
+  };
+
+  const handleSimulateProgress = (t: TicketVoucher, inc: number) => {
+    setActiveChallenges((prev) => {
+      const cur = (prev[t.id] || 0) + inc;
+      if (cur >= t.targetAmount) {
+        toast.success(`🎉 Challenge Completed! Voucher unlocked for ${t.title}`);
+        setClaimedTicket(t);
+        return { ...prev, [t.id]: t.targetAmount };
+      }
+      toast.info(`Logged +${inc.toLocaleString()} ${t.unit}! (${cur.toLocaleString()} / ${t.targetAmount.toLocaleString()})`);
+      return { ...prev, [t.id]: cur };
+    });
+  };
+
+  const handleRedeemTicketWithPoints = (t: TicketVoucher) => {
+    if (points < t.pointsPrice) {
+      toast.error(`Need ${t.pointsPrice.toLocaleString()} pts to redeem. You have ${points.toLocaleString()} pts.`);
+      return;
+    }
+    setPoints((p) => p - t.pointsPrice);
+    setClaimedTicket(t);
+    toast.success(`Ticket Voucher Claimed! -${t.pointsPrice} pts.`);
+  };
+
+  const handleSimulateTalk = (hrs = 1) => {
+    setTalkHours((h) => {
+      const next = +(h + hrs).toFixed(1);
+      const earned = hrs * 300;
+      setPoints((p) => p + earned);
+      toast.success(`Logged ${hrs}h in-person talk session! +${earned} presence points.`);
+      return next;
+    });
+  };
+
+
+
+
+
 
   const handle = ME.handle;
   const count = (k: Stamp["kind"]) => stamps.filter((s) => s.kind === k).length;
@@ -235,25 +311,7 @@ function MyProfile() {
     [String(5 + count("craft")), "crafts"],
   ] as const;
 
-  const handleWithdraw = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(payoutAmount);
-    if (isNaN(val) || val <= 0 || val > points / 100) {
-      toast.error("Please enter a valid amount within your available balance.");
-      return;
-    }
-    setPayoutBusy(true);
-    setTimeout(() => {
-      setPoints((p) => Math.max(0, p - Math.round(val * 100)));
-      setPayoutBusy(false);
-      setWithdrawModal(false);
-      toast.success(
-        `Withdrawal of $${val.toFixed(2)} requested! Payout will arrive in your ${
-          payoutMethod === "bank" ? "bank account" : payoutMethod === "paypal" ? "PayPal" : "local merchant voucher"
-        } in 1-2 business days.`
-      );
-    }, 1200);
-  };
+  // Cash withdrawal replaced by physical milestone vouchers & ticket passes
 
   const simulateCheckin = (placeName: string) => {
     addStamp("place", placeName);
@@ -317,50 +375,283 @@ function MyProfile() {
         ))}
       </nav>
 
-      {/* TAB 1: REWARDS & STAMPS (Enhanced as per User Request) */}
+      {/* TAB 1: REWARDS & STAMPS: TICKETS, CHALLENGES & BRAND PERKS */}
       {tab === "rewards" && (
         <div className="space-y-8 py-6">
-          {/* A) In-App Points with Cashout Banner */}
+          {/* A) Presence Points & New User Multiplier Station */}
           <section className="relative overflow-hidden rounded-3xl border border-sand bg-gradient-to-br from-paper-raised via-paper to-sand/20 p-6 shadow-paper">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink uppercase tracking-wider">
-                  <Coins className="size-3.5" /> Real-World Presence Rewards
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink uppercase tracking-wider">
+                    <Coins className="size-3.5" /> Real-World Presence Rewards
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-800">
+                    <Sparkles className="size-3.5 text-amber-600 animate-pulse" /> New Explorer Tier · 2.5x Multiplier Active (Day 6 of 30)
+                  </span>
                 </div>
                 <h2 className="font-serif text-3xl font-extrabold text-ink sm:text-4xl">
                   {points.toLocaleString()} <span className="text-xl font-normal text-ink-muted">pts</span>
-                  <span className="ml-3 font-sans text-2xl font-bold text-moss">~ ${(points / 100).toFixed(2)} USD</span>
                 </h2>
                 <p className="max-w-xl text-xs sm:text-sm text-ink-muted leading-relaxed">
-                  You earn in-app points by stepping outside, visiting local independent places, and meeting friends in real life.
-                  No ads, no data sales. Points can be withdrawn as real cash or converted into local cafe perks.
+                  Earn presence points by walking outdoors, talking with friends face-to-face, and staying off algorithmic screens.
+                  Redeem your accumulated points directly for real-world airline tickets, handcrafted frames, rail passes, and indie books.
                 </p>
                 <div className="flex flex-wrap gap-3 pt-1 text-xs font-medium text-ink-muted">
-                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 100 pts / hr offline</span>
-                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 250 pts / 1-on-1 meetup</span>
-                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 500 pts / group meetup</span>
-                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 150 pts / place stamp</span>
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 150 pts / 1,000 steps walked</span>
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 400 pts / 1-on-1 face-to-face meetup</span>
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 800 pts / 2h phone-free talk</span>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
-                <Button
-                  onClick={() => setWithdrawModal(true)}
-                  className="bg-ink hover:bg-ink/90 text-paper-raised font-bold shadow-postcard px-6 py-5 text-sm rounded-2xl flex items-center justify-center gap-2"
-                >
-                  <Wallet className="size-4 text-stamp-glow" /> Withdraw as Cash
-                </Button>
-                <button
-                  onClick={() => toast.info("100 pts = $1.00 USD. Direct ACH, PayPal, or Local Shop Credit.")}
-                  className="text-xs text-center text-ink-muted hover:text-ink underline"
-                >
-                  How cashouts work
-                </button>
+              {/* Quick Simulator & Stats */}
+              <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0 border-t lg:border-t-0 lg:border-l border-sand/70 pt-4 lg:pt-0 lg:pl-6">
+                <span className="text-xs font-bold uppercase tracking-wider text-ink-muted">Quick Point Earners:</span>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setPoints((p) => p + 375);
+                      toast.success("Outdoor walk recorded! +375 pts (with 2.5x New User Bonus).");
+                    }}
+                    className="border-sand bg-paper hover:bg-line text-xs font-semibold"
+                  >
+                    <Footprints className="size-3.5 text-stamp mr-1" /> Log 2,500 Steps
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSimulateTalk(1)}
+                    className="border-sand bg-paper hover:bg-line text-xs font-semibold"
+                  >
+                    <Users className="size-3.5 text-moss mr-1" /> Log 1h Real Talk
+                  </Button>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Reward Filters */}
+          {/* B) Horizontal Carousel of Partner Tickets & Passes */}
+          <section className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Ticket className="size-5 text-stamp" />
+                  <h3 className="font-serif text-2xl font-bold text-ink">Real-World Partner Tickets & Passes</h3>
+                </div>
+                <p className="text-xs text-ink-muted">
+                  Swipe horizontally to browse passes. Complete physical offline challenges or redeem with presence points.
+                </p>
+              </div>
+
+              {/* Slider Arrows */}
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={scrollTicketPrev}
+                  className="size-8 rounded-full border-sand hover:bg-line"
+                  aria-label="Previous ticket"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={scrollTicketNext}
+                  className="size-8 rounded-full border-sand hover:bg-line"
+                  aria-label="Next ticket"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Horizontal Track */}
+            <div
+              ref={ticketTrackRef}
+              className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x scroll-smooth cursor-grab active:cursor-grabbing"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {TICKET_PASSES.map((t) => {
+                const Icon = getIconForCategory(t.category);
+                const currentProgress = activeChallenges[t.id];
+                const isActive = currentProgress !== undefined;
+                const pct = isActive ? Math.min(100, Math.round((currentProgress / t.targetAmount) * 100)) : 0;
+                const isCompleted = isActive && currentProgress >= t.targetAmount;
+
+                return (
+                  <div
+                    key={t.id}
+                    className="w-[85vw] max-w-[360px] sm:w-[350px] shrink-0 snap-center rounded-3xl border border-sand bg-paper-raised p-5 shadow-paper flex flex-col justify-between transition-transform hover:-translate-y-1 duration-200"
+                  >
+                    <div>
+                      {/* Image Preview & Category Badge */}
+                      <div className="relative mb-3.5 h-36 overflow-hidden rounded-2xl bg-line border border-sand/40">
+                        <img src={t.heroImg} alt={t.title} className="h-full w-full object-cover" />
+                        <span className="absolute top-2.5 left-2.5 rounded-full bg-paper-raised/90 backdrop-blur px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-stamp-ink shadow-sm">
+                          {t.badge}
+                        </span>
+                        <span className="absolute bottom-2.5 right-2.5 rounded-full bg-ink/80 backdrop-blur px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm flex items-center gap-1">
+                          <Icon className="size-3.5 text-amber-300" /> {t.partner}
+                        </span>
+                      </div>
+
+                      <h4 className="font-serif text-lg font-bold text-ink leading-snug">{t.title}</h4>
+                      <p className="mt-1.5 text-xs text-ink-muted leading-relaxed line-clamp-2">{t.rewardDesc}</p>
+
+                      {/* Challenge status or requirement */}
+                      <div className="mt-3.5 rounded-2xl border border-sand/60 bg-paper p-3 text-xs">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-semibold text-ink-muted">Challenge Target:</span>
+                          <span className="font-mono font-bold text-ink">{t.targetAmount.toLocaleString()} {t.unit}</span>
+                        </div>
+
+                        {isActive ? (
+                          <div className="mt-2 space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-bold">
+                              <span className="text-stamp">Active Challenge</span>
+                              <span className="text-ink">{currentProgress.toLocaleString()} / {t.targetAmount.toLocaleString()} ({pct}%)</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-sand/40 overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-stamp to-moss transition-all duration-300"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-ink-muted/80 italic">"{t.tagline}"</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-4 pt-3 border-t border-sand/60 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-ink-muted">Redeem instantly:</span>
+                        <span className="font-serif font-bold text-ink">{t.pointsPrice.toLocaleString()} pts</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {isActive ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSimulateProgress(t, t.challengeType === "steps" ? 2500 : t.challengeType === "pages" ? 50 : 1)}
+                            className="border-sand bg-paper hover:bg-line text-xs font-semibold"
+                          >
+                            <Zap className="size-3.5 mr-1 text-stamp" />
+                            {isCompleted ? "Completed" : t.challengeType === "steps" ? "+2.5k Steps" : t.challengeType === "pages" ? "+50 Pgs" : "+1 Stamp"}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleActivateChallenge(t)}
+                            className="border-sand bg-paper hover:bg-line text-xs font-semibold"
+                          >
+                            Activate Challenge
+                          </Button>
+                        )}
+
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (isCompleted) {
+                              setClaimedTicket(t);
+                            } else {
+                              handleRedeemTicketWithPoints(t);
+                            }
+                          }}
+                          className={cn(
+                            "text-xs font-bold",
+                            isCompleted ? "bg-moss text-white hover:bg-moss/90" : "bg-stamp text-primary-foreground hover:bg-stamp-ink"
+                          )}
+                        >
+                          <Ticket className="size-3.5 mr-1" />
+                          {isCompleted ? "Claim Voucher" : `Redeem (${t.pointsPrice}p)`}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* C) Direct In-Person Talk & Bluetooth Presence Card */}
+          <section className="relative overflow-hidden rounded-3xl border border-sand bg-paper-raised p-6 shadow-paper">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-sand pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex size-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex size-3 rounded-full bg-emerald-500" />
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                    BLE Proximity & Real-World Interaction Sensor Active
+                  </span>
+                </div>
+                <h3 className="font-serif text-2xl font-bold text-ink">In-Person Talk & Presence Milestone Rewards</h3>
+                <p className="text-xs text-ink-muted">
+                  Earn points simply by speaking face-to-face with friends in real life without digital interruptions.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSimulateTalk(1)}
+                  className="border-sand bg-paper hover:bg-line text-xs font-semibold"
+                >
+                  <Users className="size-3.5 mr-1 text-stamp" /> Log +1h Face-to-Face Talk
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-sand bg-paper p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-bold text-ink">
+                  <span>30 Mins Talk</span>
+                  <span className="text-moss flex items-center gap-1"><Check className="size-3.5" /> Achieved</span>
+                </div>
+                <p className="mt-1 text-xs text-ink-muted">Short catch-up over tea or walk.</p>
+                <div className="mt-3 font-serif text-base font-bold text-stamp">+200 points awarded</div>
+              </div>
+
+              <div className="rounded-2xl border border-sand bg-paper p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-bold text-ink">
+                  <span>2 Hours Deep Talk</span>
+                  <span className="text-moss flex items-center gap-1"><Check className="size-3.5" /> Achieved</span>
+                </div>
+                <p className="mt-1 text-xs text-ink-muted">Long walk or dinner without phones.</p>
+                <div className="mt-3 font-serif text-base font-bold text-stamp">+600 points awarded</div>
+              </div>
+
+              <div className="rounded-2xl border-2 border-stamp/60 bg-stamp-soft/30 p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-bold text-ink">
+                  <span>5 Hours Deep Session</span>
+                  <span className="text-stamp font-mono font-bold">{talkHours}h / 5.0h</span>
+                </div>
+                <p className="mt-1 text-xs text-ink-muted">Afternoon making art or traveling together.</p>
+                <div className="mt-3 font-serif text-base font-bold text-stamp-ink">+1,500 pts + Roaster Pass</div>
+              </div>
+
+              <div className="rounded-2xl border border-sand bg-paper p-4 shadow-sm">
+                <div className="flex items-center justify-between text-xs font-bold text-ink">
+                  <span>24/48h Monthly Meetup</span>
+                  <span className="text-ink-muted font-bold">Tier 4</span>
+                </div>
+                <p className="mt-1 text-xs text-ink-muted">Cumulative offline monthly connection time.</p>
+                <div className="mt-3 font-serif text-base font-bold text-ink-muted">Explorer Flight Pass Tier</div>
+              </div>
+            </div>
+          </section>
+
+          {/* Reward Filters for Place Challenges */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sand pb-3">
             <div>
               <h3 className="font-serif text-xl font-bold text-ink">Stamps Inside Rewards</h3>
@@ -797,91 +1088,11 @@ function MyProfile() {
         </div>
       )}
 
-      {/* WITHDRAW CASH MODAL */}
-      <Dialog open={withdrawModal} onOpenChange={setWithdrawModal}>
-        <DialogContent className="border-sand bg-paper-raised sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-2xl font-bold flex items-center gap-2">
-              <Wallet className="size-6 text-stamp" /> Withdraw In-App Points as Cash
-            </DialogTitle>
-            <DialogDescription>
-              Convert points earned by being in the physical world into real money.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleWithdraw} className="space-y-4 pt-2">
-            <div className="rounded-2xl border border-sand bg-paper p-4">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-ink-muted">Available Balance:</span>
-                <span className="font-bold text-ink">{points} pts (~ ${(points / 100).toFixed(2)})</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-moss font-semibold">
-                <span>Conversion rate:</span>
-                <span>100 points = $1.00 USD</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
-                Withdrawal Amount ($ USD)
-              </label>
-              <div className="relative">
-                <DollarSign className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  max={(points / 100).toString()}
-                  value={payoutAmount}
-                  onChange={(e) => setPayoutAmount(e.target.value)}
-                  className="pl-8 bg-paper font-semibold text-lg"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
-                Payout Method
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "bank", label: "Bank ACH" },
-                  { id: "paypal", label: "PayPal" },
-                  { id: "local", label: "Local Credit (+15%)" },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setPayoutMethod(m.id as any)}
-                    className={cn(
-                      "rounded-xl border p-2 text-center text-xs font-semibold transition-all",
-                      payoutMethod === m.id
-                        ? "border-stamp bg-stamp-soft text-stamp-ink font-bold"
-                        : "border-sand bg-paper text-ink-muted hover:text-ink"
-                    )}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-line/50 p-3 text-[11px] text-ink-muted leading-relaxed">
-              <p className="font-semibold text-ink mb-1">Funded by community value, not ad surveillance:</p>
-              Our payout pool is supported by local independent commerce subscriptions and patrons who value digital wellbeing. Zero ads, zero tracking.
-            </div>
-
-            <Button
-              type="submit"
-              disabled={payoutBusy || points <= 0}
-              className="w-full bg-stamp hover:bg-stamp-ink text-primary-foreground font-bold py-3 text-sm"
-            >
-              {payoutBusy ? "Processing Payout..." : `Request $${payoutAmount} Payout`}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <DigitalTicketModal
+        ticket={claimedTicket}
+        onClose={() => setClaimedTicket(null)}
+        userName={session?.name || "Sam"}
+      />
 
       {/* REDEEM VOUCHER MODAL */}
       <Dialog open={redeemModal !== null} onOpenChange={() => setRedeemModal(null)}>

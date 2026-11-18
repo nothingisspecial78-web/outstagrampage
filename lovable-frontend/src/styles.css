@@ -183,3 +183,25 @@
 @utility animate-heart { animation: heart-pop 1s ease-out forwards; }
 @keyframes story-bar { from { width: 0; } to { width: 100%; } }
 @utility animate-story { animation: story-bar 5s linear forwards; }
+
+
+/* Anti-Screenshot, Screen Capture & Print Protection */
+@media print {
+  html, body {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+html, body {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img, video {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+}

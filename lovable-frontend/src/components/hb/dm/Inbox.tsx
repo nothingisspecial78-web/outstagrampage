@@ -315,6 +315,37 @@ function Conversation({ chat }: { chat: Chat }) {
                   />
                 </div>
               </div>
+            ) : m.postcard ? (
+              /* Postcard Note with Embedded Media */
+              <div className={cn("mb-3 flex", m.mine ? "justify-end" : "justify-start")}>
+                <div
+                  className={cn(
+                    "max-w-[85%] sm:max-w-[70%] overflow-hidden rounded-2xl border p-2 text-sm shadow-sm transition-all",
+                    m.mine
+                      ? "rounded-br-md border-sand bg-paper-raised text-ink"
+                      : "rounded-bl-md border-sand bg-paper text-ink"
+                  )}
+                >
+                  <div className="relative mb-2 overflow-hidden rounded-xl bg-neutral-900 border border-sand/40">
+                    <img
+                      src={m.postcard.img}
+                      alt={m.postcard.caption}
+                      className="aspect-[16/10] w-full object-cover"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2.5 text-white">
+                      <p className="font-hand text-base leading-tight line-clamp-1">"{m.postcard.caption}"</p>
+                      <p className="text-[11px] font-mono uppercase tracking-wider text-white/80">{m.postcard.from} · {m.postcard.place}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-paper px-3 py-2 border border-sand/40">
+                    <p className="font-hand text-xl text-ink leading-snug">{m.text}</p>
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-ink-muted">
+                      <span>Shared moment note</span>
+                      <span className="font-mono text-[10px] uppercase text-stamp font-semibold">{m.postcard.date}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               /* Regular Text Bubble */
               <div className={cn("mb-2 flex", m.mine ? "justify-end" : "justify-start")}>

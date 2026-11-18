@@ -18,6 +18,7 @@ import { CallModal } from "@/components/call/CallModal";
 import { IncomingCallDialog } from "@/components/call/IncomingCallDialog";
 import { AppShell } from "@/components/hb/AppShell";
 import { Splash } from "@/components/hb/Splash";
+import { AntiScreenshotGuard } from "@/components/hb/AntiScreenshotGuard";
 import { Toaster } from "@/components/ui/sonner";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
@@ -138,6 +139,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <StoreProvider>
         <CallProvider>
+          <AntiScreenshotGuard />
           <Splash />
           <Shell />
           <CallModal />
