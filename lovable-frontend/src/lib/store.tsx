@@ -10,7 +10,18 @@ export const MESSAGE_LIMIT_STEP = 20;
 
 export type Postcard = { id: string; from: string; place: string; date: string; img: string; caption: string };
 export type Stamp = { id: string; kind: "place" | "meetup" | "quest" | "craft"; label: string; date: string };
-export type Msg = { id: string; mine: boolean; text: string };
+export type Msg = {
+  id: string;
+  mine: boolean;
+  text: string;
+  audioUrl?: string;
+  audioDuration?: number;
+  callRecord?: {
+    type: "voice" | "video";
+    status: "completed" | "missed" | "declined";
+    duration?: number;
+  };
+};
 export type Chat = { id: string; name: string; place: string; limit: number; messages: Msg[] };
 export type Craft = { id: string; title: string; mediums: string[]; notes: string; date: string };
 
@@ -109,6 +120,13 @@ function useStoreState() {
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [offers, setOffers] = useState<Offer[]>(initialOffers);
   const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [quests, setQuests] = useState<string[]>([
+    "Notice 3 things in nature",
+    "Walk for 20 minutes without your phone",
+    "Find a local cafe and sit outside",
+    "Send a postcard to an old friend",
+    "Visit a bookstore and browse a new section",
+  ]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -207,14 +225,17 @@ function useStoreState() {
     ).catch(() => {});
   };
 
-  const addCraft = (title: string, mediums: string[], notes: string) => {
+  const addCraft = (
+    titleOrCraft: string | { title: string; mediums: string[]; notes: string },
+    maybeMediums?: string[],
+    maybeNotes?: string
+  ) => {
+    const title = typeof titleOrCraft === "string" ? titleOrCraft : titleOrCraft.title;
+    const mediums = typeof titleOrCraft === "string" ? (maybeMediums || []) : titleOrCraft.mediums;
+    const notes = typeof titleOrCraft === "string" ? (maybeNotes || "") : titleOrCraft.notes;
     setCrafts((c) => [{ id: `c_${Date.now()}`, title, mediums, notes, date: today() }, ...c]);
     addStamp("craft", title);
-    logCraftToSupabase(
-      title,
-      mediums,
-      notes
-    ).catch(() => {});
+    logCraftToSupabase(title, mediums, notes).catch(() => {});
   };
 
   const sendMsg = (chatId: string, text: string) => {
@@ -229,6 +250,58 @@ function useStoreState() {
 
   const send = (chatId: string, text: string) => {
     sendMsg(chatId, text);
+  };
+
+  const sendVoice = (chatId: string, audioUrl: string, duration: number) => {
+    setChats((cs) =>
+      cs.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              messages: [
+                ...c.messages,
+                {
+                  id: `m_voice_${Date.now()}`,
+                  mine: true,
+                  text: "Voice message",
+                  audioUrl,
+                  audioDuration: duration,
+                },
+              ],
+            }
+          : c
+      )
+    );
+  };
+
+  const logCallEvent = (
+    chatId: string,
+    type: "voice" | "video",
+    status: "completed" | "missed" | "declined",
+    duration?: number
+  ) => {
+    const durationLabel = duration !== undefined
+      ? ` · ${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, "0")}`
+      : "";
+    const callRecord = duration !== undefined ? { type, status, duration } : { type, status };
+    setChats((cs) =>
+      cs.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              messages: [
+                ...c.messages,
+                {
+                  id: `m_call_${Date.now()}`,
+                  mine: true,
+                  text: `${type === "voice" ? "Voice" : "Video"} call (${status})${durationLabel}`,
+                  callRecord,
+                },
+              ],
+            }
+          : c
+      )
+    );
   };
 
   const unlockChat = (chatId: string) => {
@@ -295,16 +368,24 @@ function useStoreState() {
     setMembers((ms) => ms.map((m) => (m.id === memberId ? { ...m, status } : m)));
   };
 
+  const setMember = (id: string, patch: Partial<Member>) => {
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  };
+
+  const addQuest = (q: string) => setQuests((prev) => [q, ...prev]);
+  const removeQuest = (q: string) => setQuests((prev) => prev.filter((x) => x !== q));
+
   return {
     hours, questDone, seen, rack, stamps, crafts, chats, coachLeft, demo, session, ready,
-    reports, offers, members,
+    reports, offers, members, quests,
     friends, setFriends, addFriend, addFriendName,
     dwell, setDwell, setDemo,
     signIn, signOut,
     setSession,
-    addPostcard, logQuest, completeQuest, addCraft, sendMsg, send, unlockChat, unlock, startChat,
+    addStamp,
+    addPostcard, logQuest, completeQuest, addCraft, sendMsg, send, sendVoice, logCallEvent, unlockChat, unlock, startChat,
     groupStamp, useCoach, toggleDemo, markSeen, setSeen,
-    resolveReport, reviewOffer, setMemberStatus,
+    resolveReport, reviewOffer, setMemberStatus, setMember, addQuest, removeQuest,
     capture: (place: string) => addStamp("place", place),
   };
 }

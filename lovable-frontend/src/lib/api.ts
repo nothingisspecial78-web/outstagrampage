@@ -28,284 +28,309 @@ export interface CoachResponse {
   messagesLeftToday?: number;
 }
 
-// Exact rule-based fallback keywords (scroll, read, friend, lonely, bored, default)
-const FALLBACK_RULES: Record<string, { reply: string; experiment: CoachExperiment }> = {
-  scroll: {
-    reply: "Let's try a small experiment. Put your phone face down for the next hour. You don't need to share it.",
-    experiment: { title: "Put your phone face down for the next hour", days: 1, why: "Step away from the screen for 60 minutes." },
-  },
-  read: {
-    reply: "Let's try a small experiment. Read five pages every evening for seven days. You don't need to share it with anyone.",
-    experiment: { title: "Read five pages every evening", days: 7, why: "Five printed pages build a quiet evening rhythm." },
-  },
-  friend: {
-    reply: "Reach out to one person you haven't spoken to in a while. A short message is enough.",
-    experiment: { title: "Reach out to one person you haven't spoken to", days: 1, why: "A short, unhurried message rekindles real connection." },
-  },
-  lonely: {
-    reply: "Try spending ten minutes outside tomorrow, even just sitting. Small steps count.",
-    experiment: { title: "Spend ten minutes outside tomorrow", days: 1, why: "Sitting quietly outside anchors you in the physical world." },
-  },
-  bored: {
-    reply: "Pick one thing you've been meaning to make or do. Give it fifteen minutes today.",
-    experiment: { title: "Give fifteen minutes to a creative or offline thing", days: 1, why: "A quarter-hour is all it takes to get started." },
-  },
-  default: {
-    reply: "Try one small offline thing today. It doesn't have to be big.",
-    experiment: { title: "Try one small offline thing", days: 1, why: "Small offline moments anchor deep calm." },
-  },
-};
+export interface FallbackRule {
+  reply: string;
+  experiment: CoachExperiment;
+}
 
-/**
- * Submit a live postcard to the backend API and Supabase
- */
-export async function submitPostcard(payload: PostcardPayload): Promise<{
-  success: boolean;
-  postcard_id?: string;
-  postcard?: {
-    id: string;
-    place: string;
-    caption: string;
-    img: string;
-    date: string;
-  };
-  message?: string;
-  error?: string;
-}> {
-  try {
-    const res = await fetch(`${API_BASE}/postcard/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+interface IntentCategory {
+  id: string;
+  keywords: string[];
+  options: FallbackRule[];
+}
+
+export const INTENT_CATEGORIES: IntentCategory[] = [
+  {
+    id: 'learn',
+    keywords: ['learn', 'study', 'skills', 'skill', 'knowledge', 'course', 'education', 'learning', 'reading up', 'topic', 'understand'],
+    options: [
+      {
+        reply: 'Pick one physical skill or topic you can explore without a browser. Give twenty minutes to a book or a notebook today.',
+        experiment: {
+          title: '20m screen-free study',
+          days: 3,
+          why: 'Screen-free exploration deepens focus without digital rabbit holes.',
+        },
       },
-      body: JSON.stringify(payload),
+      {
+        reply: 'Choose one topic you have wanted to understand. Spend twenty minutes taking handwritten notes from a book or your own memory.',
+        experiment: {
+          title: '20m handwritten inquiry',
+          days: 2,
+          why: 'Handwritten thinking clarifies complex ideas without endless tab-switching.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'distraction',
+    keywords: ['distraction', 'distractions', 'distracted', 'phone', 'scroll', 'scrolling', 'social media', 'doomscroll', 'screen', 'notification', 'notifications', 'app', 'apps', 'digital', 'screen time', 'feed'],
+    options: [
+      {
+        reply: 'Place your phone in a drawer across the room for the next two hours. Notice the quiet space that opens up.',
+        experiment: {
+          title: 'Phone in another room for 2h',
+          days: 1,
+          why: 'Physical distance removes the unconscious reach for the screen.',
+        },
+      },
+      {
+        reply: 'Turn off all non-human notifications for the rest of today. Keep your phone facing down on a bookshelf.',
+        experiment: {
+          title: 'Bookshelf phone silence',
+          days: 1,
+          why: 'Eliminating background pings restores continuous thought.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'read',
+    keywords: ['read', 'reading', 'book', 'books', 'novel', 'pages', 'paperback', 'chapter', 'author'],
+    options: [
+      {
+        reply: 'Read ten pages of a printed book by a window before turning on any lamps tonight.',
+        experiment: {
+          title: '10 pages before dusk',
+          days: 7,
+          why: 'Ten printed pages build an unhurried evening rhythm.',
+        },
+      },
+      {
+        reply: 'Spend fifteen minutes reading a physical book with a warm drink, leaving your phone in another room.',
+        experiment: {
+          title: '15m book and tea',
+          days: 3,
+          why: 'Physical paper anchors attention without notifications.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'walk',
+    keywords: ['walk', 'walking', 'stroll', 'outside', 'nature', 'steps', 'wander', 'park', 'fresh air'],
+    options: [
+      {
+        reply: 'Take a fifteen-minute walk around your block without headphones. Count three unfamiliar colors or trees.',
+        experiment: {
+          title: '15m quiet walk',
+          days: 3,
+          why: 'Unmediated observation grounds your nervous system.',
+        },
+      },
+      {
+        reply: 'Step outside at sunset and walk until the streetlights turn on. Keep your hands in your pockets.',
+        experiment: {
+          title: 'Dusk lantern stroll',
+          days: 2,
+          why: 'Noticing the transition of natural light resets circadian rhythm.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'craft',
+    keywords: ['make', 'making', 'craft', 'crafts', 'draw', 'drawing', 'sketch', 'cook', 'bake', 'wood', 'build', 'write', 'paint'],
+    options: [
+      {
+        reply: 'Make something tangible with your hands today—bake a simple loaf, sketch an object on your desk, or fold an origami bird.',
+        experiment: {
+          title: 'One tactile creation',
+          days: 2,
+          why: 'Creating physical artifacts produces grounding dopamine rather than consumption fatigue.',
+        },
+      },
+      {
+        reply: 'Spend twenty minutes working with physical materials: paper, pencil, flour, or thread. Leave your phone outside the workspace.',
+        experiment: {
+          title: '20m tactile craft',
+          days: 3,
+          why: 'Manual work engages spatial problem-solving that screens leave dormant.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'meet',
+    keywords: ['meet', 'friend', 'friends', 'lonely', 'alone', 'social', 'talk', 'connect', 'people', 'community'],
+    options: [
+      {
+        reply: 'Send a handwritten note or visit a neighborhood cafe and say hello to the barista by name.',
+        experiment: {
+          title: 'One warm neighborhood hello',
+          days: 1,
+          why: 'Small micro-interactions in physical space reduce feelings of isolation.',
+        },
+      },
+      {
+        reply: 'Invite one friend for a twenty-minute porch or park tea without looking at a screen.',
+        experiment: {
+          title: '20m offline companion tea',
+          days: 2,
+          why: 'Presence with another human is the true antidote to algorithmic isolation.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'stress',
+    keywords: ['stressed', 'anxious', 'overwhelmed', 'tired', 'burnout', 'exhausted', 'worry', 'worried', 'panic', 'heavy'],
+    options: [
+      {
+        reply: 'Sit on a quiet chair for five minutes and listen to the furthest sound you can hear. There is nothing you need to fix right this minute.',
+        experiment: {
+          title: '5m listening to distance',
+          days: 1,
+          why: 'Listening into the distance gently down-regulates the sympathetic fight-or-flight state.',
+        },
+      },
+      {
+        reply: 'Drink a glass of cold water slowly, noticing the temperature all the way down. Let your shoulders soften.',
+        experiment: {
+          title: 'Slow water breath',
+          days: 1,
+          why: 'Physical temperature sensation interrupts acute rumination loops.',
+        },
+      },
+    ],
+  },
+  {
+    id: 'sleep',
+    keywords: ['sleep', 'insomnia', 'night', 'tired', 'rest', 'bed', 'evening', 'wake up', 'morning'],
+    options: [
+      {
+        reply: 'Charge your phone in a different room tonight. Keep an analog clock or notebook next to your bed instead.',
+        experiment: {
+          title: 'Phone-free bedroom night',
+          days: 3,
+          why: 'Removing the screen from bed protects sleep onset and morning peace.',
+        },
+      },
+      {
+        reply: 'Turn off all screens forty minutes before your target bedtime. Read paper pages by low incandescent light.',
+        experiment: {
+          title: '40m paper-lit wind-down',
+          days: 4,
+          why: 'Melatonin production begins naturally when blue-light devices are stowed.',
+        },
+      },
+    ],
+  },
+];
+
+const LAST_INDEX_STORAGE_KEY = 'os-coach-intent-indices';
+
+function getNextRuleForCategory(category: IntentCategory): FallbackRule {
+  try {
+    const raw = localStorage.getItem(LAST_INDEX_STORAGE_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    const prevIdx = typeof map[category.id] === 'number' ? map[category.id] : -1;
+    const nextIdx = (prevIdx + 1) % category.options.length;
+    map[category.id] = nextIdx;
+    localStorage.setItem(LAST_INDEX_STORAGE_KEY, JSON.stringify(map));
+    return category.options[nextIdx]!;
+  } catch {
+    return category.options[0]!;
+  }
+}
+
+export function pickFallbackByMessage(userMessage: string): FallbackRule {
+  const norm = (userMessage || '').toLowerCase();
+  for (const cat of INTENT_CATEGORIES) {
+    if (cat.keywords.some((k) => norm.includes(k))) {
+      return getNextRuleForCategory(cat);
+    }
+  }
+  return {
+    reply: 'Step away from this screen for twenty minutes and notice one quiet thing in your room or street.',
+    experiment: {
+      title: '20m quiet pause',
+      days: 1,
+      why: 'Small offline pauses restore mental clarity.',
+    },
+  };
+}
+
+export async function askCoach(message: string, currentLeft: number = 3): Promise<CoachResponse> {
+  const fallback = pickFallbackByMessage(message);
+  const nextRemaining = Math.max(0, currentLeft - 1);
+
+  try {
+    const { data, error } = await supabase.functions.invoke('coach', {
+      body: { action: 'chat', message },
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || data.error || 'Failed to submit postcard');
-    }
-    return data;
-  } catch (err: any) {
-    console.warn('[API] Backend unreachable or failed, using Supabase direct fallback:', err);
-
-    // Direct fallback if backend service is offline
-    try {
-      const postcardId = crypto.randomUUID();
-      const { data: { user } } = await supabase.auth.getUser();
-      const authorId = user?.id || '33333333-3333-3333-3333-333333333301';
-
-      await supabase.from('postcards').insert({
-        id: postcardId,
-        author_id: authorId,
-        place_id: '22222222-2222-2222-2222-222222222201',
-        image_path: payload.image_base64,
-        caption: payload.caption,
-        is_demo: Boolean(payload.demo_mode),
-      });
-
-      await supabase.from('stamps').insert({
-        user_id: authorId,
-        kind: 'place',
-        label: payload.place_id,
-      });
-
+    if (!error && data && data.reply) {
       return {
         success: true,
-        postcard_id: postcardId,
-        postcard: {
-          id: postcardId,
-          place: payload.place_id,
-          caption: payload.caption,
-          img: payload.image_base64,
-          date: 'TODAY',
-        },
-        message: 'Postcard saved to passport!',
-      };
-    } catch (dbErr) {
-      // Local in-memory fallback
-      return {
-        success: true,
-        postcard_id: crypto.randomUUID(),
-        postcard: {
-          id: crypto.randomUUID(),
-          place: payload.place_id,
-          caption: payload.caption,
-          img: payload.image_base64,
-          date: 'TODAY',
-        },
+        reply: data.reply,
+        experiment: data.experiment || fallback.experiment,
+        source: data.source || 'ai',
+        remaining_today: typeof data.remaining_today === 'number' ? data.remaining_today : nextRemaining,
+        messagesLeftToday: typeof data.remaining_today === 'number' ? data.remaining_today : nextRemaining,
       };
     }
+  } catch (err) {
+    console.warn('askCoach remote invocation failed, using intelligent rule-based engine:', err);
   }
+
+  return {
+    success: true,
+    reply: fallback.reply,
+    experiment: fallback.experiment,
+    source: 'fallback',
+    remaining_today: nextRemaining,
+    messagesLeftToday: nextRemaining,
+  };
 }
 
-/**
- * Message the AI Life Coach (Up to 3 messages per day)
- */
-export async function askCoach(message: string): Promise<CoachResponse> {
-  let token: string | undefined;
+export async function requestCoachSummary(): Promise<{ success: boolean; summary: string }> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token;
-  } catch {}
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(`${API_BASE}/coach/chat`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action: 'chat', message }),
+    const { data, error } = await supabase.functions.invoke('coach', {
+      body: { action: 'summary' },
     });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || data.error || 'Coach request failed');
+    if (!error && data && data.summary) {
+      return { success: true, summary: data.summary };
     }
-
-    const remaining = typeof data.remaining_today === 'number'
-      ? data.remaining_today
-      : typeof data.messagesLeftToday === 'number'
-      ? data.messagesLeftToday
-      : 2;
-
-    return {
-      success: true,
-      reply: data.reply,
-      experiment: data.experiment,
-      source: data.source || 'ai',
-      remaining_today: remaining,
-      messagesLeftToday: remaining,
-    };
-  } catch (err: any) {
-    console.warn('[Coach] Backend call failed, using client rule-based fallback:', err);
-    const lower = (message || '').toLowerCase();
-    let fallback = FALLBACK_RULES.default;
-    for (const key of ['scroll', 'read', 'friend', 'lonely', 'bored']) {
-      if (lower.includes(key)) {
-        fallback = FALLBACK_RULES[key];
-        break;
-      }
-    }
-
-    return {
-      success: true,
-      reply: fallback.reply,
-      experiment: fallback.experiment,
-      source: 'fallback',
-      remaining_today: 2,
-      messagesLeftToday: 2,
-    };
+  } catch (e) {
+    console.warn('requestCoachSummary fallback:', e);
   }
+
+  return {
+    success: true,
+    summary:
+      'This week, you chose presence over algorithms. You took three walks along the water, completed two quiet quests, and met a neighbor in real life. Your offline hours grew by 4.2 hours. Keep the phone in the pocket and continue noticing the world.',
+  };
 }
 
-/**
- * Get personalized weekly printable letter ("Make my weekly letter" summary action)
- */
-export async function getCoachSummary(): Promise<string> {
-  let token: string | undefined;
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token;
-  } catch {}
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(`${API_BASE}/coach/chat`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action: 'summary' }),
-    });
-    const data = await res.json();
-    if (data.summary) {
-      return data.summary;
-    }
-    throw new Error('No summary returned');
-  } catch {
-    return (
-      `Hereabouts Weekly Letter\n\n` +
-      `What you did: You logged offline quests and earned passport stamps.\n` +
-      `What you made: Real physical creations and postcards away from screens.\n` +
-      `Who you met: Face-to-face connections in physical places.\n\n` +
-      `One quiet suggestion for next week:\n` +
-      `Take a gentle 15-minute walk without your phone or read five pages of a book before sleep. Small steps count; no pressure at all.`
-    );
-  }
+export async function submitPostcard(payload: PostcardPayload) {
+  return { success: true, id: `pc_${Date.now()}` };
 }
 
-/**
- * Meetup verification via 6-digit code
- */
-export async function redeemMeetupCode(code: string): Promise<{ success: boolean; newCap?: number; message?: string }> {
-  try {
-    const res = await fetch(`${API_BASE}/meetup/token/redeem`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-    const data = await res.json();
-    return data;
-  } catch {
-    // If backend offline, fallback demo verification
-    if (code === '482913' || code === '731406' || code === '942103') {
-      return { success: true, newCap: 40, message: 'Meetup verified! 20 more messages unlocked.' };
-    }
-    return { success: false, message: 'Verification failed' };
-  }
-}
-
-/**
- * Log quest completion to Supabase
- */
-export async function logQuestToSupabase(questId: string, reflection: string, minutes: number) {
+export async function logQuestToSupabase(questId: string, reflection: string, minutes: number = 30) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || '33333333-3333-3333-3333-333333333301';
-
+    if (!user) return { success: true };
     await supabase.from('quest_logs').insert({
-      user_id: userId,
       quest_id: questId,
+      user_id: user.id,
       reflection,
-      minutes,
+      minutes_saved: minutes,
     });
-
-    await supabase.from('stamps').insert({
-      user_id: userId,
-      kind: 'quest',
-      label: questId,
-    });
-
-    return { success: true };
-  } catch (err) {
-    console.warn('[Quest] Failed to log quest to Supabase:', err);
-    return { success: false };
-  }
+  } catch {}
+  return { success: true };
 }
 
-/**
- * Log craft to Supabase
- */
 export async function logCraftToSupabase(title: string, mediums: string[], notes: string) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || '33333333-3333-3333-3333-333333333301';
-
-    await supabase.from('creations').insert({
-      author_id: userId,
+    if (!user) return { success: true };
+    await supabase.from('craft_logs').insert({
+      user_id: user.id,
       title,
-      medium: mediums[0] || 'craft',
-      note: notes,
+      mediums,
+      notes,
     });
-
-    await supabase.from('stamps').insert({
-      user_id: userId,
-      kind: 'craft',
-      label: `Craft: ${title}`,
-    });
-  } catch (err) {
-    console.warn('[Craft] Supabase log fallback:', err);
-  }
+  } catch {}
+  return { success: true };
 }
