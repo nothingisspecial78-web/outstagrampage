@@ -96,13 +96,15 @@ function today() {
 function useStoreState() {
   const [hours, setHours] = useState(12.5);
   const [questDone, setQuestDone] = useState(false);
-  const [seen, setSeen] = useState(0);
+  const [seen, setSeenState] = useState(0);
   const [rack, setRack] = useState<Postcard[]>(RACK);
   const [stamps, setStamps] = useState<Stamp[]>(initialStamps);
   const [crafts, setCrafts] = useState<Craft[]>(initialCrafts);
   const [chats, setChats] = useState<Chat[]>(initialChats);
   const [coachLeft, setCoachLeft] = useState(3);
   const [demo, setDemo] = useState(false);
+  const [friends, setFriends] = useState<string[]>(["Maya", "Jonas", "Priya"]);
+  const [dwell, setDwell] = useState(true);
   const [session, setSessionState] = useState<Session | null>(null);
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [offers, setOffers] = useState<Offer[]>(initialOffers);
@@ -117,6 +119,8 @@ function useStoreState() {
       if (c) setChats(JSON.parse(c));
       const s = localStorage.getItem("os-session");
       if (s) setSessionState(JSON.parse(s));
+      const f = localStorage.getItem("os-friends");
+      if (f) setFriends(JSON.parse(f));
     } catch {}
     setReady(true);
 
@@ -153,12 +157,25 @@ function useStoreState() {
       }
     }).catch(() => {});
   }, []);
+
   useEffect(() => { if (ready) { try { localStorage.setItem("os-demo", demo ? "1" : "0"); } catch {} } }, [demo, ready]);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-chats", JSON.stringify(chats)); } catch {} } }, [chats, ready]);
+  useEffect(() => { if (ready) { try { localStorage.setItem("os-friends", JSON.stringify(friends)); } catch {} } }, [friends, ready]);
+
   const setSession = (s: Session | null) => {
     setSessionState(s);
     try { s ? localStorage.setItem("os-session", JSON.stringify(s)) : localStorage.removeItem("os-session"); } catch {}
   };
+
+  const signIn = (email: string, role: Role, name?: string) => {
+    setSession({
+      email,
+      role,
+      name: name || (role === "admin" ? "Ada Admin" : "Sam Okafor"),
+    });
+  };
+
+  const signOut = () => setSession(null);
 
   const addStamp = (kind: Stamp["kind"], label: string) =>
     setStamps((s) => [{ id: `s_${Date.now()}`, kind, label, date: today() }, ...s]);
@@ -172,21 +189,32 @@ function useStoreState() {
     setQuestDone(true);
     setHours((h) => +(h + minutes / 60).toFixed(1));
     addStamp("quest", reflection.slice(0, 24));
-    logQuestToSupabase({
-      quest_id: "11111111-1111-1111-1111-111111111101",
+    logQuestToSupabase(
+      "11111111-1111-1111-1111-111111111101",
       reflection,
-      minutes,
-    }).catch(() => {});
+      minutes
+    ).catch(() => {});
+  };
+
+  const completeQuest = (minutes: number = 30) => {
+    setQuestDone(true);
+    setHours((h) => Math.round((h + minutes / 60) * 10) / 10);
+    addStamp("quest", "Notice 3 things");
+    logQuestToSupabase(
+      "11111111-1111-1111-1111-111111111101",
+      "Completed daily outdoor reflection",
+      minutes
+    ).catch(() => {});
   };
 
   const addCraft = (title: string, mediums: string[], notes: string) => {
     setCrafts((c) => [{ id: `c_${Date.now()}`, title, mediums, notes, date: today() }, ...c]);
     addStamp("craft", title);
-    logCraftToSupabase({
+    logCraftToSupabase(
       title,
       mediums,
-      notes,
-    }).catch(() => {});
+      notes
+    ).catch(() => {});
   };
 
   const sendMsg = (chatId: string, text: string) => {
@@ -199,15 +227,60 @@ function useStoreState() {
     );
   };
 
+  const send = (chatId: string, text: string) => {
+    sendMsg(chatId, text);
+  };
+
   const unlockChat = (chatId: string) => {
     setChats((cs) => cs.map((c) => (c.id === chatId ? { ...c, limit: c.limit + MESSAGE_LIMIT_STEP } : c)));
     const chat = chats.find((c) => c.id === chatId);
     addStamp("meetup", `with ${chat?.name ?? "Friend"}`);
   };
 
+  const unlock = (chatId: string) => {
+    unlockChat(chatId);
+    const chat = chats.find((x) => x.id === chatId) ?? chats[0]!;
+    setHours((h) => h + 1);
+    return chat;
+  };
+
+  const startChat = (name: string) => {
+    const first = name.split(" ")[0] ?? name;
+    const id = first.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    setChats((cs) =>
+      cs.some((c) => c.id === id)
+        ? cs
+        : [
+            {
+              id,
+              name: first,
+              place: "Somewhere nearby",
+              limit: MESSAGE_LIMIT_STEP,
+              messages: [{ id: `m_${Date.now()}`, mine: false, text: `Hi! It's ${first}. Fancy a walk sometime?` }],
+            },
+            ...cs,
+          ]
+    );
+    return id;
+  };
+
+  const addFriend = (code: string) => {
+    setFriends((f) => [...f, `Friend ${code.slice(-3)}`]);
+  };
+
+  const addFriendName = (name: string) => {
+    setFriends((f) => (f.includes(name) ? f : [...f, name]));
+  };
+
+  const groupStamp = (label: string) => {
+    addStamp("meetup", label);
+  };
+
   const useCoach = () => setCoachLeft((n) => Math.max(0, n - 1));
   const toggleDemo = () => setDemo((d) => !d);
-  const markSeen = (idx: number) => setSeen((n) => Math.max(n, idx + 1));
+  const markSeen = (idx: number) => setSeenState((n) => Math.max(n, idx + 1));
+  const setSeen = (n: number | ((prev: number) => number)) =>
+    setSeenState((prev) => (typeof n === "function" ? n(prev) : Math.max(prev, n)));
 
   // Admin moderation actions
   const resolveReport = (reportId: string, status: "kept" | "removed") => {
@@ -225,8 +298,12 @@ function useStoreState() {
   return {
     hours, questDone, seen, rack, stamps, crafts, chats, coachLeft, demo, session, ready,
     reports, offers, members,
+    friends, setFriends, addFriend, addFriendName,
+    dwell, setDwell, setDemo,
+    signIn, signOut,
     setSession,
-    addPostcard, logQuest, addCraft, sendMsg, unlockChat, useCoach, toggleDemo, markSeen,
+    addPostcard, logQuest, completeQuest, addCraft, sendMsg, send, unlockChat, unlock, startChat,
+    groupStamp, useCoach, toggleDemo, markSeen, setSeen,
     resolveReport, reviewOffer, setMemberStatus,
     capture: (place: string) => addStamp("place", place),
   };
