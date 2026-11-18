@@ -98,45 +98,48 @@ function useStoreState() {
   const [questDone, setQuestDone] = useState(false);
   const [seen, setSeen] = useState(0);
   const [rack, setRack] = useState<Postcard[]>(RACK);
-  const [chats, setChats] = useState(initialChats);
-  const [stamps, setStamps] = useState(initialStamps);
-  const [crafts, setCrafts] = useState(initialCrafts);
-  const [demo, setDemo] = useState(false);
+  const [stamps, setStamps] = useState<Stamp[]>(initialStamps);
+  const [crafts, setCrafts] = useState<Craft[]>(initialCrafts);
+  const [chats, setChats] = useState<Chat[]>(initialChats);
   const [coachLeft, setCoachLeft] = useState(3);
-  const [friends, setFriends] = useState<string[]>(["Maya", "Jonas", "Priya"]);
+  const [demo, setDemo] = useState(false);
   const [session, setSessionState] = useState<Session | null>(null);
+  const [reports, setReports] = useState<Report[]>(initialReports);
+  const [offers, setOffers] = useState<Offer[]>(initialOffers);
+  const [members, setMembers] = useState<Member[]>(initialMembers);
   const [ready, setReady] = useState(false);
-  const [dwell, setDwell] = useState(true);
-  const [reports, setReports] = useState(initialReports);
-  const [offers, setOffers] = useState(initialOffers);
-  const [members, setMembers] = useState(initialMembers);
-  const [quests, setQuests] = useState(["Walk 100 steps and notice three things", "Say hi to a shopkeeper by name", "Sit somewhere new for 15 minutes"]);
+
   useEffect(() => {
-    try { const raw = localStorage.getItem("os-session"); if (raw) setSessionState(JSON.parse(raw)); } catch {}
-    try { const c = localStorage.getItem("os-chats"); if (c) setChats(JSON.parse(c)); } catch {}
-    try { if (localStorage.getItem("os-demo") === "1") setDemo(true); } catch {}
+    try {
+      const d = localStorage.getItem("os-demo");
+      if (d !== null) setDemo(d === "1");
+      const c = localStorage.getItem("os-chats");
+      if (c) setChats(JSON.parse(c));
+      const s = localStorage.getItem("os-session");
+      if (s) setSessionState(JSON.parse(s));
+    } catch {}
     setReady(true);
 
-    // Hydrate live data from Supabase if connected
-    Promise.all([fetchLiveQuests(), fetchLiveOffers()]).then(([qList, oList]) => {
-      if (qList && qList.length > 0) {
-        setQuests(qList.map((q: any) => q.title || q.description));
-      }
-      if (oList && oList.length > 0) {
-        setOffers(oList.map((o: any) => ({
-          id: o.id,
-          place: o.place_id || "Riverside Cafe",
-          partner: o.partner_name || "Partner",
-          text: o.description || o.title || "Special perk",
-          status: o.status || "live"
-        })));
+    // Initial background sync with Supabase tables
+    Promise.all([fetchLiveQuests(), fetchLivePlaces(), fetchLiveOffers()]).then(([q, p, o]) => {
+      if (o && o.length > 0) {
+        const liveOffers: Offer[] = o.map((item: any) => ({
+          id: item.id,
+          place: item.places?.name || "Local Shop",
+          partner: item.places?.name || "Partner",
+          text: item.description,
+          status: item.status as Offer["status"],
+        }));
+        setOffers((prev) => [...liveOffers, ...prev]);
       }
     }).catch((err) => {
       console.warn("Supabase initial sync fallback:", err);
     });
 
     // Also fetch live postcards from Supabase
-    supabase.from('postcards').select('*').order('taken_at', { ascending: false }).limit(10).then(({ data }) => {
+    Promise.resolve(
+      supabase.from('postcards').select('*').order('taken_at', { ascending: false }).limit(10)
+    ).then(({ data }: any) => {
       if (data && data.length > 0) {
         const liveCards: Postcard[] = data.map((p: any) => ({
           id: p.id,
@@ -158,69 +161,86 @@ function useStoreState() {
   };
 
   const addStamp = (kind: Stamp["kind"], label: string) =>
-    setStamps((s) => [{ id: crypto.randomUUID(), kind, label, date: today() }, ...s]);
+    setStamps((s) => [{ id: `s_${Date.now()}`, kind, label, date: today() }, ...s]);
+
+  const addPostcard = (pc: Postcard) => {
+    setRack((r) => [pc, ...r]);
+    addStamp("place", pc.place);
+  };
+
+  const logQuest = (reflection: string, minutes: number = 30) => {
+    setQuestDone(true);
+    setHours((h) => +(h + minutes / 60).toFixed(1));
+    addStamp("quest", reflection.slice(0, 24));
+    logQuestToSupabase({
+      quest_id: "11111111-1111-1111-1111-111111111101",
+      reflection,
+      minutes,
+    }).catch(() => {});
+  };
+
+  const addCraft = (title: string, mediums: string[], notes: string) => {
+    setCrafts((c) => [{ id: `c_${Date.now()}`, title, mediums, notes, date: today() }, ...c]);
+    addStamp("craft", title);
+    logCraftToSupabase({
+      title,
+      mediums,
+      notes,
+    }).catch(() => {});
+  };
+
+  const sendMsg = (chatId: string, text: string) => {
+    setChats((cs) =>
+      cs.map((c) =>
+        c.id === chatId
+          ? { ...c, messages: [...c.messages, { id: `m_${Date.now()}`, mine: true, text }] }
+          : c
+      )
+    );
+  };
+
+  const unlockChat = (chatId: string) => {
+    setChats((cs) => cs.map((c) => (c.id === chatId ? { ...c, limit: c.limit + MESSAGE_LIMIT_STEP } : c)));
+    const chat = chats.find((c) => c.id === chatId);
+    addStamp("meetup", `with ${chat?.name ?? "Friend"}`);
+  };
+
+  const useCoach = () => setCoachLeft((n) => Math.max(0, n - 1));
+  const toggleDemo = () => setDemo((d) => !d);
+  const markSeen = (idx: number) => setSeen((n) => Math.max(n, idx + 1));
+
+  // Admin moderation actions
+  const resolveReport = (reportId: string, status: "kept" | "removed") => {
+    setReports((rs) => rs.map((r) => (r.id === reportId ? { ...r, status } : r)));
+  };
+
+  const reviewOffer = (offerId: string, status: "live" | "rejected") => {
+    setOffers((os) => os.map((o) => (o.id === offerId ? { ...o, status } : o)));
+  };
+
+  const setMemberStatus = (memberId: string, status: "active" | "suspended") => {
+    setMembers((ms) => ms.map((m) => (m.id === memberId ? { ...m, status } : m)));
+  };
 
   return {
-    hours, questDone, seen, rack, chats, stamps, crafts, demo, coachLeft, friends,
-    session, ready, dwell, setDwell, reports, offers, members, quests,
-    signIn: (email: string, role: Role, name?: string) => setSession({ email, role, name: name || (role === "admin" ? "Ada Admin" : "Sam Okafor") }),
-    signOut: () => setSession(null),
-    resolveReport: (id: string, status: Report["status"]) => setReports((r) => r.map((x) => x.id === id ? { ...x, status } : x)),
-    reviewOffer: (id: string, status: Offer["status"]) => setOffers((o) => o.map((x) => x.id === id ? { ...x, status } : x)),
-    setMember: (id: string, patch: Partial<Member>) => setMembers((m) => m.map((x) => x.id === id ? { ...x, ...patch } : x)),
-    addQuest: (q: string) => setQuests((qs) => [...qs, q]),
-    removeQuest: (q: string) => setQuests((qs) => qs.filter((x) => x !== q)),
-    groupStamp: (label: string) => addStamp("meetup", label),
-    setSeen, setDemo,
-    completeQuest: (minutes: number) => {
-      setQuestDone(true);
-      setHours((h) => Math.round((h + minutes / 60) * 10) / 10);
-      addStamp("quest", "Notice 3 things");
-      logQuestToSupabase("11111111-1111-1111-1111-111111111101", "Completed daily outdoor reflection", minutes);
-    },
-    send: (chatId: string, text: string) =>
-      setChats((cs) => cs.map((c) => c.id === chatId && c.messages.length < c.limit
-        ? { ...c, messages: [...c.messages, { id: crypto.randomUUID(), mine: true, text }] } : c)),
-    unlock: (chatId: string) => {
-      const c = chats.find((x) => x.id === chatId) ?? chats[0]!;
-      setChats((cs) => cs.map((x) => x.id === c.id ? { ...x, limit: x.limit + MESSAGE_LIMIT_STEP } : x));
-      addStamp("meetup", `with ${c.name}`);
-      setHours((h) => h + 1);
-      return c;
-    },
-    startChat: (name: string) => {
-      const first = name.split(" ")[0] ?? name;
-      const id = first.toLowerCase().replace(/[^a-z0-9]+/g, "");
-      setChats((cs) => cs.some((c) => c.id === id) ? cs : [{ id, name: first, place: "Somewhere nearby", limit: MESSAGE_LIMIT_STEP, messages: [{ id: crypto.randomUUID(), mine: false, text: `Hi! It's ${first}. Fancy a walk sometime?` }] }, ...cs]);
-      return id;
-    },
-    addFriendName: (name: string) => setFriends((f) => f.includes(name) ? f : [...f, name]),
+    hours, questDone, seen, rack, stamps, crafts, chats, coachLeft, demo, session, ready,
+    reports, offers, members,
+    setSession,
+    addPostcard, logQuest, addCraft, sendMsg, unlockChat, useCoach, toggleDemo, markSeen,
+    resolveReport, reviewOffer, setMemberStatus,
     capture: (place: string) => addStamp("place", place),
-    addPostcard: (p: Postcard) => {
-      setRack((r) => [p, ...r]);
-      addStamp("place", p.place);
-    },
-    useCoach: () => setCoachLeft((n) => Math.max(0, n - 1)),
-    addCraft: (c: Omit<Craft, "id" | "date">) => {
-      setCrafts((cs) => [{ ...c, id: crypto.randomUUID(), date: today() }, ...cs]);
-      addStamp("craft", c.mediums[0] ?? "Craft");
-      logCraftToSupabase(c.title, c.mediums, c.notes);
-    },
-    addFriend: (code: string) => setFriends((f) => [...f, `Friend ${code.slice(-3)}`]),
   };
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const s = useStoreState();
-  return <Ctx.Provider value={s}>{children}</Ctx.Provider>;
-}
-export function useStore() {
-  const s = useContext(Ctx);
-  if (!s) throw new Error("useStore outside provider");
-  return s;
+  const store = useStoreState();
+  return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
 
-export function captionValid(t: string) {
-  const n = t.trim().length;
-  return n >= 8 && n <= 140;
+export function useStore() {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useStore outside StoreProvider");
+  return ctx;
 }
+
+export const captionValid = (c: string) => c.trim().length >= 8 && c.length <= 140;
