@@ -23,7 +23,7 @@ export function Avatar({ src, size = "size-8", ring, className }: { src: string;
   return <span className={cn("inline-flex shrink-0 rounded-full p-[2px]", ring === "story" ? "story-ring" : "seen-ring", className)}>{img}</span>;
 }
 
-type Panel = null | "search" | "notifications";
+type Panel = null | "search" | "notifications" | "menu";
 const MORE = [
   { to: "/quest", label: "Daily Quest", icon: Footprints },
   { to: "/meet", label: "Meet to Unlock", icon: KeyRound },
@@ -102,10 +102,95 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button aria-label="Close panel" className="fixed inset-0 z-30 cursor-default" onClick={() => setPanel(null)} />
           <section className="animate-in slide-in-from-left-4 fade-in fixed inset-y-0 left-0 z-40 w-full overflow-y-auto rounded-r-2xl border-r border-sand bg-paper-raised shadow-postcard duration-200 md:left-[72px] md:w-[397px]">
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
-              <h2 className="text-2xl font-bold text-ink">{panel === "search" ? "Search" : "Notifications"}</h2>
+              <h2 className="text-2xl font-bold text-ink">{panel === "search" ? "Search" : panel === "menu" ? "Menu" : "Notifications"}</h2>
               <button onClick={() => setPanel(null)} aria-label="Close" className="rounded-full p-1 hover:bg-line md:hidden"><X className="size-5" /></button>
             </div>
-            {panel === "search" ? <SearchPanel onPick={() => setPanel(null)} /> : (
+            {panel === "search" ? (
+              <SearchPanel onPick={() => setPanel(null)} />
+            ) : panel === "menu" ? (
+              <div className="flex flex-col gap-1 p-4 pb-16">
+                <div className="mb-2 px-3 py-1">
+                  <HoursChip />
+                </div>
+                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Explore</p>
+                <Link
+                  to="/"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                >
+                  <Home className="size-5 text-stamp-ink" />
+                  <span>Home</span>
+                </Link>
+                {MORE.map((m) => (
+                  <Link
+                    key={m.to}
+                    to={m.to}
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                  >
+                    <m.icon className="size-5 text-stamp-ink" />
+                    <span>{m.label}</span>
+                  </Link>
+                ))}
+                <div className="my-2 border-t border-sand" />
+                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Quick Access</p>
+                <Link
+                  to="/rack"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                >
+                  <Clapperboard className="size-5 text-stamp-ink" />
+                  <span>Finite Rack</span>
+                </Link>
+                <Link
+                  to="/capture"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                >
+                  <PlusSquare className="size-5 text-stamp-ink" />
+                  <span>Capture Moment</span>
+                </Link>
+                <Link
+                  to="/chats"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                >
+                  <Send className="size-5 text-stamp-ink" />
+                  <span>Chats ({unread} unread)</span>
+                </Link>
+                <Link
+                  to="/passport"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                >
+                  <Avatar src={ME.avatar} size="size-5" />
+                  <span>Passport & Stats</span>
+                </Link>
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-semibold text-stamp-ink transition-colors hover:bg-line"
+                  >
+                    <ShieldCheck className="size-5 text-stamp-ink" />
+                    <span>Admin console</span>
+                  </Link>
+                )}
+                <div className="my-2 border-t border-sand" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanel(null);
+                    signOut();
+                    navigate({ to: "/login" });
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] font-medium text-destructive transition-colors hover:bg-line"
+                >
+                  <LogOut className="size-5" />
+                  <span>Log out {session?.name ? `(${session.name.split(' ')[0]})` : ''}</span>
+                </button>
+              </div>
+            ) : (
               <ul className="px-3">
                 <p className="px-3 pb-2 text-sm font-bold text-ink">This week</p>
                 {NOTES.map((n, i) => (
@@ -125,7 +210,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link to="/"><Wordmark className="text-[30px]" /></Link>
         <div className="flex items-center gap-5">
           {isAdmin && <Link to="/admin" aria-label="Admin console" className="text-stamp-ink"><ShieldCheck className="size-6" /></Link>}
-          <Link to="/settings" aria-label="Settings"><Menu className="size-6" /></Link>
+          <button type="button" onClick={() => toggle("menu")} aria-label="Open menu" className="rounded-md p-1 text-ink transition-colors hover:bg-line"><Menu className="size-6" /></button>
           <Link to="/chats" aria-label="Messages" className="relative"><Send className="size-6" />{badge}</Link>
         </div>
       </header>
