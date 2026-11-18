@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { FlaskConical, Mail, Printer, Send, Sparkles, Clock, CheckCircle2 } from "lucide-react";
+import { FlaskConical, Mail, Printer, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { WaxSeal } from "@/components/hb/EnvelopeLock";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { askCoach, getCoachSummary, CoachExperiment } from "@/lib/api";
+import { askCoach, getCoachSummary, getCoachRemainingCount, CoachExperiment } from "@/lib/api";
 
 export const Route = createFileRoute("/coach")({
   head: () => ({
@@ -26,8 +26,8 @@ export const Route = createFileRoute("/coach")({
 interface Turn {
   role: "me" | "coach";
   text: string;
-  source?: "ai" | "fallback";
-  experiment?: CoachExperiment;
+  source?: "ai" | "fallback" | undefined;
+  experiment?: CoachExperiment | undefined;
 }
 
 const DEFAULT_EXPERIMENTS: CoachExperiment[] = [
@@ -38,7 +38,9 @@ const DEFAULT_EXPERIMENTS: CoachExperiment[] = [
 
 function Coach() {
   const { coachLeft, useCoach } = useStore();
-  const [remainingToday, setRemainingToday] = useState<number>(coachLeft);
+  const [remainingToday, setRemainingToday] = useState<number>(() => {
+    return Math.min(coachLeft, getCoachRemainingCount());
+  });
   const [turns, setTurns] = useState<Turn[]>([
     {
       role: "coach",
@@ -51,9 +53,9 @@ function Coach() {
   const [letterContent, setLetterContent] = useState<string>("");
   const [loadingLetter, setLoadingLetter] = useState(false);
 
-  // Sync remaining messages with store
   useEffect(() => {
-    setRemainingToday(coachLeft);
+    const quotaRemaining = getCoachRemainingCount();
+    setRemainingToday(Math.min(coachLeft, quotaRemaining));
   }, [coachLeft]);
 
   const handleMakeWeeklyLetter = async () => {
@@ -62,7 +64,7 @@ function Coach() {
       const summary = await getCoachSummary();
       setLetterContent(summary);
       setLetterOpen(true);
-    } catch (err) {
+    } catch {
       toast.error("Failed to generate weekly letter. Please try again.");
     } finally {
       setLoadingLetter(false);
@@ -72,7 +74,7 @@ function Coach() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = text.trim();
-    if (!query || remainingToday === 0 || thinking) return;
+    if (!query || remainingToday <= 0 || thinking) return;
 
     setTurns((t) => [...t, { role: "me", text: query }]);
     setText("");
@@ -97,8 +99,9 @@ function Coach() {
       }
     } catch {
       setThinking(false);
-      const ex = DEFAULT_EXPERIMENTS[(3 - remainingToday) % DEFAULT_EXPERIMENTS.length]!;
-      setRemainingToday((prev) => Math.max(0, prev - 1));
+      const nextRemaining = Math.max(0, remainingToday - 1);
+      setRemainingToday(nextRemaining);
+      const ex = DEFAULT_EXPERIMENTS[(3 - nextRemaining) % DEFAULT_EXPERIMENTS.length]!;
       setTurns((t) => [
         ...t,
         {
@@ -143,7 +146,6 @@ function Coach() {
           </div>
         </header>
 
-        {/* Conversation Stream */}
         <div className="my-6 space-y-4">
           {turns.map((t, i) => (
             <div
@@ -168,7 +170,6 @@ function Coach() {
               >
                 <p className="whitespace-pre-line">{t.text}</p>
 
-                {/* Returned Experiment as a Card (Title + Days) */}
                 {t.experiment && (
                   <div className="mt-3 rounded-xl border border-moss/30 bg-moss/10 p-3.5">
                     <div className="flex items-center justify-between gap-2">
@@ -180,9 +181,9 @@ function Coach() {
                         {t.experiment.days} {t.experiment.days === 1 ? "day" : "days"}
                       </span>
                     </div>
-                    {t.experiment.why && (
+                    {(t.experiment.why || t.experiment.description) && (
                       <p className="mt-1.5 text-xs text-ink-muted leading-normal">
-                        {t.experiment.why}
+                        {t.experiment.why || t.experiment.description}
                       </p>
                     )}
                   </div>
@@ -199,7 +200,17 @@ function Coach() {
           )}
         </div>
 
-        {/* Message Input Form */}
+        {remainingToday === 0 && (
+          <div className="my-4 rounded-xl border border-sand bg-sand/30 p-4 text-center shadow-subtle animate-rise">
+            <p className="font-serif text-sm italic text-ink">
+              “You have used your 3 check-ins for today. Time to put the screen down and try the experiment.”
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              Step away from your screen and notice the unhurried world around you.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={submit} className="flex gap-2">
           <input
             type="text"
@@ -209,7 +220,7 @@ function Coach() {
             maxLength={500}
             placeholder={
               remainingToday === 0
-                ? "No messages left today. Enjoy the world outside."
+                ? "You have used your 3 check-ins for today. Time to put the screen down and try the experiment."
                 : "Ask for an offline experiment or habit (1-500 chars)…"
             }
             className="flex-1 rounded-xl border border-sand bg-paper-raised px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-stamp disabled:opacity-50"
@@ -217,20 +228,19 @@ function Coach() {
           <Button
             type="submit"
             disabled={!text.trim() || remainingToday === 0 || thinking}
-            className="rounded-xl bg-stamp text-primary-foreground hover:bg-stamp/90"
+            className="rounded-xl bg-stamp text-primary-foreground hover:bg-stamp/90 disabled:opacity-50"
           >
             <Send className="size-4" />
           </Button>
         </form>
       </div>
 
-      {/* Weekly Letter Dialog */}
       <Dialog open={letterOpen} onOpenChange={setLetterOpen}>
         <DialogContent className="max-w-lg border border-sand bg-paper p-6 text-ink shadow-paper sm:rounded-2xl">
           <DialogHeader className="border-b border-sand pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <WaxSeal status="sealed" />
+                <WaxSeal className="size-8" />
                 <div>
                   <DialogTitle className="font-serif text-xl font-bold">Your Weekly Letter</DialogTitle>
                   <DialogDescription className="text-xs text-ink-muted">
