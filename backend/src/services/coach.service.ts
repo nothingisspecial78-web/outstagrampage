@@ -1,7 +1,8 @@
-import { getAIProvider } from '../ai/provider-factory.js';
+import { executeWithFallback } from '../ai/provider-factory.js';
 import {
   buildCoachSystemPrompt,
   getRuleBasedFallback,
+  extractExperimentFromText,
   UserHabitContext,
 } from '../ai/coach-prompt.js';
 import { CoachResponse } from '../types.js';
@@ -25,27 +26,30 @@ export class CoachService {
     }
 
     const systemPrompt = buildCoachSystemPrompt(habitContext);
-    const provider = getAIProvider();
 
     try {
-      const reply = await provider.generateCompletion({
+      const { reply } = await executeWithFallback({
         systemPrompt,
         userMessage,
         timeoutMs: 8000,
       });
 
+      const experiment = extractExperimentFromText(reply);
+
       return {
         reply,
         source: 'ai',
+        experiment,
         remaining_today: Math.max(0, 3 - userMessagesTodayCount - 1),
       };
     } catch (err: any) {
       console.warn('AI call failed or timed out. Engaging rule-based fallback:', err.message);
-      const fallbackReply = getRuleBasedFallback(userMessage);
+      const fallback = getRuleBasedFallback(userMessage);
 
       return {
-        reply: fallbackReply,
+        reply: fallback.reply,
         source: 'fallback',
+        experiment: fallback.experiment,
         remaining_today: Math.max(0, 3 - userMessagesTodayCount - 1),
       };
     }
@@ -53,12 +57,17 @@ export class CoachService {
 
   /**
    * Generates a quiet weekly offline habit letter.
+   * Covers what you did, what you made, who you met, and one suggestion for next week.
    */
   static generateWeeklySummary(
     userName: string,
     habitContext: UserHabitContext,
     weekStartDate: string
   ): string {
+    const suggestion = habitContext.daysDoneLast7 <= 3
+      ? "Take a gentle 5-minute walk without your phone or read two pages of a book before sleep. Small steps count; no pressure at all."
+      : "Choose one afternoon to leave your phone at home and explore a street you have not walked before.";
+
     return (
       `Hereabouts Weekly Letter\n` +
       `Week of ${weekStartDate}\n\n` +
@@ -66,11 +75,10 @@ export class CoachService {
       `This week you walked, noticed, and stepped away from screens. Here is what your week looked like:\n` +
       `• Quests completed: ${habitContext.daysDoneLast7} offline daily challenges.\n` +
       `• Passport stamps earned: ${habitContext.stampsLast7} real moments collected.\n` +
+      `• Postcards made: ${habitContext.creationsLast7 ?? 0} physical moments documented.\n` +
       `• In-person meetups: ${habitContext.meetupsLast7} face-to-face connections.\n\n` +
-      `For the next seven days, try this one small adjustment:\n` +
-      (habitContext.daysDoneLast7 <= 3
-        ? `Read just 3 pages of a printed book in the evening, and put your phone in another room during one meal.\n\n`
-        : `Take one 15-minute walk with your phone turned completely off.\n\n`) +
+      `One quiet suggestion for next week:\n` +
+      `${suggestion}\n\n` +
       `Nothing to track, nothing to share. Just notice how it feels.\n\n` +
       `Gently,\nYour Hereabouts Coach`
     );
