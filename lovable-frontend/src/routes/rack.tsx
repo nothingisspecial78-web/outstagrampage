@@ -31,12 +31,12 @@ const TEMPLATES = [
 ];
 
 function Rack() {
-  const cards = RACK.slice(0, 10);
+  const { rack, setSeen, dwell } = useStore();
+  const cards = (rack || RACK).slice(0, 10);
   const total = cards.length + 1;
   const ref = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const [open, setOpen] = useState<P | null>(null);
-  const { setSeen, dwell } = useStore();
   const [wait, setWait] = useState(false);
   useEffect(() => { if (!dwell) { setWait(false); return; } setWait(true); const t = setTimeout(() => setWait(false), 3000); return () => clearTimeout(t); }, [idx, dwell]);
 

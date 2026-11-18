@@ -14,6 +14,16 @@ if (process.env.NODE_ENV !== "development") {
 }
 
 export default defineConfig({
+  vite: {
+    server: {
+      proxy: {
+        "/api": {
+          target: "http://localhost:4000",
+          changeOrigin: true,
+        },
+      },
+    },
+  },
   esbuild: {
     jsxDev: false,
   },

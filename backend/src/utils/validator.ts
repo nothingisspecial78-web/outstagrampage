@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const CreatePostcardSchema = z.object({
-  place_id: z.string().uuid(),
+  place_id: z.string().min(1, 'Place ID or location name is required'),
   caption: z
     .string()
     .trim()

@@ -4,6 +4,7 @@ import garden from "@/assets/pc-garden.jpg";
 import books from "@/assets/pc-books.jpg";
 import pier from "@/assets/pc-pier.jpg";
 import { supabase, fetchLiveQuests, fetchLivePlaces, fetchLiveOffers } from "./supabase";
+import { logQuestToSupabase, logCraftToSupabase } from "./api";
 
 export const MESSAGE_LIMIT_STEP = 20;
 
@@ -96,6 +97,7 @@ function useStoreState() {
   const [hours, setHours] = useState(12.5);
   const [questDone, setQuestDone] = useState(false);
   const [seen, setSeen] = useState(0);
+  const [rack, setRack] = useState<Postcard[]>(RACK);
   const [chats, setChats] = useState(initialChats);
   const [stamps, setStamps] = useState(initialStamps);
   const [crafts, setCrafts] = useState(initialCrafts);
@@ -132,6 +134,21 @@ function useStoreState() {
     }).catch((err) => {
       console.warn("Supabase initial sync fallback:", err);
     });
+
+    // Also fetch live postcards from Supabase
+    supabase.from('postcards').select('*').order('taken_at', { ascending: false }).limit(10).then(({ data }) => {
+      if (data && data.length > 0) {
+        const liveCards: Postcard[] = data.map((p: any) => ({
+          id: p.id,
+          from: "You",
+          place: "Riverside Cafe",
+          date: "TODAY",
+          img: p.image_path || cafe,
+          caption: p.caption,
+        }));
+        setRack((existing) => [...liveCards, ...existing]);
+      }
+    }).catch(() => {});
   }, []);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-demo", demo ? "1" : "0"); } catch {} } }, [demo, ready]);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-chats", JSON.stringify(chats)); } catch {} } }, [chats, ready]);
@@ -144,7 +161,7 @@ function useStoreState() {
     setStamps((s) => [{ id: crypto.randomUUID(), kind, label, date: today() }, ...s]);
 
   return {
-    hours, questDone, seen, chats, stamps, crafts, demo, coachLeft, friends,
+    hours, questDone, seen, rack, chats, stamps, crafts, demo, coachLeft, friends,
     session, ready, dwell, setDwell, reports, offers, members, quests,
     signIn: (email: string, role: Role, name?: string) => setSession({ email, role, name: name || (role === "admin" ? "Ada Admin" : "Sam Okafor") }),
     signOut: () => setSession(null),
@@ -159,6 +176,7 @@ function useStoreState() {
       setQuestDone(true);
       setHours((h) => Math.round((h + minutes / 60) * 10) / 10);
       addStamp("quest", "Notice 3 things");
+      logQuestToSupabase("11111111-1111-1111-1111-111111111101", "Completed daily outdoor reflection", minutes);
     },
     send: (chatId: string, text: string) =>
       setChats((cs) => cs.map((c) => c.id === chatId && c.messages.length < c.limit
@@ -178,10 +196,15 @@ function useStoreState() {
     },
     addFriendName: (name: string) => setFriends((f) => f.includes(name) ? f : [...f, name]),
     capture: (place: string) => addStamp("place", place),
+    addPostcard: (p: Postcard) => {
+      setRack((r) => [p, ...r]);
+      addStamp("place", p.place);
+    },
     useCoach: () => setCoachLeft((n) => Math.max(0, n - 1)),
     addCraft: (c: Omit<Craft, "id" | "date">) => {
       setCrafts((cs) => [{ ...c, id: crypto.randomUUID(), date: today() }, ...cs]);
       addStamp("craft", c.mediums[0] ?? "Craft");
+      logCraftToSupabase(c.title, c.mediums, c.notes);
     },
     addFriend: (code: string) => setFriends((f) => [...f, `Friend ${code.slice(-3)}`]),
   };

@@ -36,8 +36,9 @@ const Card = ({ className, children }: { className?: string; children: React.Rea
 );
 
 function Today() {
-  const { hours, seen, chats, stamps, session } = useStore();
-  const left = Math.max(0, RACK.length - seen);
+  const { hours, seen, rack, chats, stamps, session } = useStore();
+  const activeRack = rack || RACK;
+  const left = Math.max(0, activeRack.length - seen);
   const first = (session?.name ?? "Sam").split(" ")[0];
 
   return (
@@ -58,9 +59,9 @@ function Today() {
 
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
-          <div className="flex items-center justify-between"><h2 className="font-serif text-xl font-semibold text-ink">Today's rack</h2><span className="text-sm text-ink-muted">{left} of {RACK.length} left</span></div>
+          <div className="flex items-center justify-between"><h2 className="font-serif text-xl font-semibold text-ink">Today's rack</h2><span className="text-sm text-ink-muted">{left} of {activeRack.length} left</span></div>
           <div className="mt-4 flex -space-x-6">
-            {RACK.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-24 rounded-sm border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-3" : "-rotate-3")} />)}
+            {activeRack.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-24 rounded-sm border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-3" : "-rotate-3")} />)}
           </div>
           <p className="mt-4 text-sm text-ink-muted">{left ? "Ten postcards from friends, sideways, then it ends." : "You've seen everything. Go outside."}</p>
           <Link to="/rack" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground">Open today's rack <ArrowRight className="size-4" /></Link>

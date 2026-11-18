@@ -9,6 +9,7 @@ import { ME } from "@/lib/people";
 import { WaxSeal } from "@/components/hb/EnvelopeLock";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { askCoach, getCoachSummary } from "@/lib/api";
 
 export const Route = createFileRoute("/coach")({
   head: () => ({
@@ -38,12 +39,46 @@ function Coach() {
   const [thinking, setThinking] = useState(false);
   const [letter, setLetter] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const [dynamicSummary, setDynamicSummary] = useState<string>("");
+
+  useEffect(() => {
+    getCoachSummary().then((s) => {
+      if (s) setDynamicSummary(s);
+    });
+  }, []);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || coachLeft === 0) return;
-    const ex = EXPERIMENTS[(3 - coachLeft) % EXPERIMENTS.length]!;
-    setTurns((t) => [...t, { role: "me", text: text.trim() }]); setText(""); useCoach(); setThinking(true);
-    setTimeout(() => { setThinking(false); setTurns((t) => [...t, { role: "coach", text: "That sounds familiar. Let's try one tiny thing, offline:", experiment: ex }]); }, 1100);
+    const query = text.trim();
+    if (!query || coachLeft === 0) return;
+    setTurns((t) => [...t, { role: "me", text: query }]);
+    setText("");
+    useCoach();
+    setThinking(true);
+
+    try {
+      const res = await askCoach(query);
+      setThinking(false);
+      setTurns((t) => [
+        ...t,
+        {
+          role: "coach",
+          text: res.reply,
+          experiment: res.experiment,
+        },
+      ]);
+    } catch {
+      setThinking(false);
+      const ex = EXPERIMENTS[(3 - coachLeft) % EXPERIMENTS.length]!;
+      setTurns((t) => [
+        ...t,
+        {
+          role: "coach",
+          text: "That sounds familiar. Let's try one tiny thing, offline:",
+          experiment: ex,
+        },
+      ]);
+    }
   };
 
   const CHIPS = ["I scroll before bed", "I want to read more", "I miss my friends", "I feel restless at lunch"];
@@ -93,17 +128,23 @@ function Coach() {
           <DialogHeader className="sr-only"><DialogTitle>Your weekly letter</DialogTitle><DialogDescription>A printable letter of offline habits.</DialogDescription></DialogHeader>
           <article className="ruled relative rounded-sm border border-line bg-paper-raised p-6 font-hand text-xl leading-7 text-ink shadow-paper">
             <div className="absolute -top-4 right-6"><WaxSeal className="size-12" /></div>
-            <p className="font-serif text-sm not-italic tracking-widest text-ink-muted">WEEK OF NOV 16</p>
-            <p className="mt-4">Dear Sam,</p>
-            <p className="mt-2">This week you walked, noticed, and met Priya at the park. That's 12 hours given back to your life.</p>
-            <p className="mt-2">For the next seven days, try just these:</p>
-            <ul className="mt-1 list-inside list-disc">
-              <li>Read 5 pages each evening.</li>
-              <li>One meal, phone in another room.</li>
-              <li>Say hello to someone at the bakery.</li>
-            </ul>
-            <p className="mt-3">Nothing to track. Just notice how it feels.</p>
-            <p className="mt-4">Gently,<br />your Outstagram coach</p>
+            <p className="font-serif text-sm not-italic tracking-widest text-ink-muted">WEEK OF {new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit" }).toUpperCase()}</p>
+            {dynamicSummary ? (
+              <div className="mt-4 whitespace-pre-wrap">{dynamicSummary}</div>
+            ) : (
+              <>
+                <p className="mt-4">Dear Sam,</p>
+                <p className="mt-2">This week you walked, noticed, and met Priya at the park. That's 12 hours given back to your life.</p>
+                <p className="mt-2">For the next seven days, try just these:</p>
+                <ul className="mt-1 list-inside list-disc">
+                  <li>Read 5 pages each evening.</li>
+                  <li>One meal, phone in another room.</li>
+                  <li>Say hello to someone at the bakery.</li>
+                </ul>
+                <p className="mt-3">Nothing to track. Just notice how it feels.</p>
+                <p className="mt-4">Gently,<br />your Outstagram coach</p>
+              </>
+            )}
           </article>
           <Button onClick={() => window.print()}><Printer /> Print letter</Button>
         </DialogContent>
