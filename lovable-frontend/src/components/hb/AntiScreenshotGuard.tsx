@@ -52,16 +52,7 @@ export function AntiScreenshotGuard() {
       }
     };
 
-    // 2. Window blur & visibility change (triggered when mobile screenshot gestures or multitasking open)
-    const handleBlur = () => {
-      // Immediately cloak screen with privacy veil so OS screenshot captures privacy card
-      setBlurred(true);
-    };
-
-    const handleFocus = () => {
-      setBlurred(false);
-    };
-
+    // 2. Visibility change (triggered when tab is hidden or app is backgrounded)
     const handleVisibilityChange = () => {
       if (document.hidden) {
         setBlurred(true);
@@ -84,15 +75,11 @@ export function AntiScreenshotGuard() {
         triggerProtection();
       }
     });
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("contextmenu", handleContextMenu);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("contextmenu", handleContextMenu);
     };

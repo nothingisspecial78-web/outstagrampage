@@ -94,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="my-1 border-t border-sand" />
                 <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/terms"><FileText className="size-4" />Terms of Service</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/privacy"><Lock className="size-4" />Privacy Policy</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/about"><Compass className="size-4" />About Outstagram</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/about"><Compass className="size-4" />About Outstagram (Our Story)</Link></DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-3"><LogOut className="size-5" />Log out {session?.name ? session.name.split(" ")[0] : ""}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -244,7 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
                   >
                     <Compass className="size-4" />
-                    <span>About Outstagram</span>
+                    <span>About Outstagram (Our Story & Manifesto)</span>
                   </Link>
                   <div className="my-2 border-t border-sand" />
                   <button

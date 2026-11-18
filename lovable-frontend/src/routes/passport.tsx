@@ -240,6 +240,7 @@ function MyProfile() {
   const [claimedTicket, setClaimedTicket] = useState<TicketVoucher | null>(null);
   const [points, setPoints] = useState(2850);
   const [talkHours, setTalkHours] = useState(3.5);
+  const [redeemModal, setRedeemModal] = useState<string | null>(null);
   const ticketTrackRef = useRef<HTMLDivElement>(null);
 
   const scrollTicketPrev = () => {
@@ -928,74 +929,105 @@ function MyProfile() {
             </section>
           )}
 
-          {/* D) Stamps Achieved Displayed Cleanly Alongside Rewards */}
+          {/* D) Stamps Inside Rewards: Achieved & Featured Display */}
           {(rewardFilter === "all" || rewardFilter === "ready") && (
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sand pb-3">
                 <div className="flex items-center gap-2">
                   <StampIcon className="size-5 text-stamp" />
-                  <h4 className="font-serif text-lg font-bold text-ink">Individual Place Vouchers & Stamps</h4>
+                  <h4 className="font-serif text-xl font-bold text-ink">Stamps Inside Rewards: Achieved & Featured Perks</h4>
                 </div>
-                <span className="text-xs text-ink-muted">Present your stamped passport at the shop counter</span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-moss/15 px-2.5 py-0.5 font-bold text-moss">
+                    <Check className="size-3" /> Achieved ({stamps.length})
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-stamp-soft px-2.5 py-0.5 font-bold text-stamp-ink">
+                    <Sparkles className="size-3" /> Featured Partner Stamps
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-3">
                 {[
-                  { place: "Riverside Cafe", perk: "Free artisan cup of chai or drip coffee", need: "Riverside Cafe stamp", pointsValue: 150 },
-                  { place: "Remparts Books", perk: "10% off any vintage hardcover or atlas", need: "Remparts Books stamp", pointsValue: 200 },
-                  { place: "Corner Bakery", perk: "Complimentary day-old artisan sourdough loaf", need: "Corner Bakery stamp", pointsValue: 150 },
-                  { place: "West Pier", perk: "Seaside panoramic postcard print by local artist", need: "West Pier stamp", pointsValue: 150 },
+                  { place: "Riverside Cafe", perk: "Free artisan cup of chai or drip coffee", need: "Riverside Cafe stamp", pointsValue: 150, featured: true, tag: "Popular Everyday" },
+                  { place: "Remparts Books", perk: "10% off any vintage hardcover or atlas", need: "Remparts Books stamp", pointsValue: 200, featured: true, tag: "Indie Books" },
+                  { place: "Corner Bakery", perk: "Complimentary day-old artisan sourdough loaf after 5pm", need: "Corner Bakery stamp", pointsValue: 150, featured: true, tag: "Neighborhood Bakery" },
+                  { place: "West Pier", perk: "Seaside panoramic postcard print by local artist", need: "West Pier stamp", pointsValue: 150, featured: false, tag: "Scenic Landmark" },
+                  { place: "Linden Park", perk: "Complimentary botanical garden walking trail guide", need: "Linden Park stamp", pointsValue: 100, featured: false, tag: "Nature Walk" },
                 ].map((v) => {
                   const achieved = hasStamp(v.place);
                   return (
                     <div
                       key={v.place}
                       className={cn(
-                        "flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition-all",
-                        achieved ? "border-moss/50 bg-paper-raised shadow-paper" : "border-sand bg-paper/60 opacity-80"
+                        "relative flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border-2 p-4 transition-all overflow-hidden",
+                        achieved
+                          ? "border-moss/50 bg-paper-raised shadow-paper ring-1 ring-moss/20"
+                          : "border-dashed border-sand bg-paper/70 hover:bg-paper"
                       )}
                     >
+                      {/* Featured / Achieved Corner Badge */}
+                      <div className="absolute top-2.5 right-2.5 sm:hidden">
+                        {achieved ? (
+                          <span className="rounded-full bg-moss px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-paper-raised">
+                            Achieved
+                          </span>
+                        ) : v.featured ? (
+                          <span className="rounded-full bg-stamp-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-stamp-ink">
+                            Featured
+                          </span>
+                        ) : null}
+                      </div>
+
                       <div className="flex items-center gap-4 flex-1">
                         <Postmark
                           place={v.place}
-                          date={achieved ? "ACHIEVED" : "LOCKED"}
-                          tone={achieved ? "moss" : "ink"}
-                          className={cn("size-16 shrink-0", !achieved && "opacity-45")}
+                          date={achieved ? "ACHIEVED" : "STAMP NEEDED"}
+                          tone={achieved ? "moss" : "stamp"}
+                          className={cn("size-16 shrink-0 transition-opacity", !achieved && "opacity-60")}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <h5 className="font-hand text-2xl text-ink leading-tight">{v.perk}</h5>
-                            {achieved && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-2 py-0.5 text-[11px] font-bold text-moss">
-                                <Check className="size-3" /> Ready
+                            {achieved ? (
+                              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-moss/15 px-2.5 py-0.5 text-[11px] font-bold text-moss">
+                                <Check className="size-3" /> Achieved Stamp
                               </span>
-                            )}
+                            ) : v.featured ? (
+                              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-stamp-soft px-2.5 py-0.5 text-[11px] font-bold text-stamp-ink">
+                                <Sparkles className="size-3" /> Featured Stamp
+                              </span>
+                            ) : null}
+                            <span className="text-[10px] uppercase font-bold text-ink-muted/70 tracking-wider">
+                              · {v.tag}
+                            </span>
                           </div>
-                          <p className="mt-0.5 text-xs text-ink-muted">
-                            {v.place} · {achieved ? "Stamp in passport · verified" : `Needs a ${v.need}`}
+                          <p className="mt-1 text-xs text-ink-muted">
+                            <span className="font-semibold text-ink">{v.place}</span> · {achieved ? "Physical stamp verified in your passport" : `Unlock by visiting ${v.place} in person`}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 sm:self-center">
+                      <div className="flex items-center gap-2 sm:self-center shrink-0">
                         {achieved ? (
                           <Button
                             size="sm"
                             onClick={() => {
                               setRedeemModal(`${v.place}: ${v.perk}`);
+                              toast.success("Ready to present at checkout!");
                             }}
-                            className="bg-moss hover:bg-moss/90 text-paper-raised text-xs font-bold px-4"
+                            className="bg-moss hover:bg-moss/90 text-paper-raised text-xs font-bold px-4 cursor-pointer"
                           >
-                            Redeem
+                            <Check className="size-3.5 mr-1" /> Redeem Voucher
                           </Button>
                         ) : (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => simulateCheckin(v.place)}
-                            className="border-sand bg-paper hover:bg-line text-xs"
+                            className="border-sand bg-paper hover:bg-line text-xs font-semibold cursor-pointer"
                           >
-                            <Lock className="size-3.5 mr-1" /> Check in here
+                            <Lock className="size-3.5 mr-1 text-stamp" /> Visit & Stamp
                           </Button>
                         )}
                       </div>

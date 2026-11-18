@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
