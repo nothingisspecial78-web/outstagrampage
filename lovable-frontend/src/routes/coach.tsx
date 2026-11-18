@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { FlaskConical, Mail, Printer, Send, Sparkles, Info, Smile } from "lucide-react";
+import { FlaskConical, Mail, Printer, Send, Sparkles, Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Avatar } from "@/components/hb/AppShell";
-import { ME } from "@/lib/people";
 import { WaxSeal } from "@/components/hb/EnvelopeLock";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { askCoach, getCoachSummary } from "@/lib/api";
+import { askCoach, getCoachSummary, CoachExperiment } from "@/lib/api";
 
 export const Route = createFileRoute("/coach")({
   head: () => ({
@@ -17,7 +15,7 @@ export const Route = createFileRoute("/coach")({
       { title: "Life Coach — Outstagram" },
       { name: "description", content: "A calm AI coach that suggests one small offline experiment at a time." },
       { property: "og:title", content: "Life Coach — Outstagram" },
-      { property: "og:description", content: "Three messages a day. One small experiment." },
+      { property: "og:description", content: "Three messages a day. One small offline experiment." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -25,8 +23,14 @@ export const Route = createFileRoute("/coach")({
   component: Coach,
 });
 
-type Turn = { role: "me" | "coach"; text: string; experiment?: { title: string; days: number; why: string } | undefined };
-const EXPERIMENTS = [
+interface Turn {
+  role: "me" | "coach";
+  text: string;
+  source?: "ai" | "fallback";
+  experiment?: CoachExperiment;
+}
+
+const DEFAULT_EXPERIMENTS: CoachExperiment[] = [
   { title: "Read 5 pages every evening", days: 7, why: "Small enough to never skip, long enough to notice a change." },
   { title: "Leave your phone in another room during dinner", days: 5, why: "Meals get longer. Conversations too." },
   { title: "Take a 10-minute walk after lunch, no headphones", days: 7, why: "Let your mind wander where it wants." },
@@ -34,23 +38,42 @@ const EXPERIMENTS = [
 
 function Coach() {
   const { coachLeft, useCoach } = useStore();
-  const [turns, setTurns] = useState<Turn[]>([{ role: "coach", text: "Hi Sam. What's been pulling at your attention lately?" }]);
+  const [remainingToday, setRemainingToday] = useState<number>(coachLeft);
+  const [turns, setTurns] = useState<Turn[]>([
+    {
+      role: "coach",
+      text: "Hi friend. I'm here to offer one small offline experiment at a time. What has been pulling at your attention lately?",
+    },
+  ]);
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
-  const [letter, setLetter] = useState(false);
+  const [letterOpen, setLetterOpen] = useState(false);
+  const [letterContent, setLetterContent] = useState<string>("");
+  const [loadingLetter, setLoadingLetter] = useState(false);
 
-  const [dynamicSummary, setDynamicSummary] = useState<string>("");
-
+  // Sync remaining messages with store
   useEffect(() => {
-    getCoachSummary().then((s) => {
-      if (s) setDynamicSummary(s);
-    });
-  }, []);
+    setRemainingToday(coachLeft);
+  }, [coachLeft]);
+
+  const handleMakeWeeklyLetter = async () => {
+    setLoadingLetter(true);
+    try {
+      const summary = await getCoachSummary();
+      setLetterContent(summary);
+      setLetterOpen(true);
+    } catch (err) {
+      toast.error("Failed to generate weekly letter. Please try again.");
+    } finally {
+      setLoadingLetter(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = text.trim();
-    if (!query || coachLeft === 0) return;
+    if (!query || remainingToday === 0 || thinking) return;
+
     setTurns((t) => [...t, { role: "me", text: query }]);
     setText("");
     useCoach();
@@ -59,22 +82,29 @@ function Coach() {
     try {
       const res = await askCoach(query);
       setThinking(false);
+      setRemainingToday(res.remaining_today);
       setTurns((t) => [
         ...t,
         {
           role: "coach",
           text: res.reply,
+          source: res.source,
           experiment: res.experiment,
         },
       ]);
+      if (res.source === "fallback") {
+        toast.info("Offline rule fallback engaged.");
+      }
     } catch {
       setThinking(false);
-      const ex = EXPERIMENTS[(3 - coachLeft) % EXPERIMENTS.length]!;
+      const ex = DEFAULT_EXPERIMENTS[(3 - remainingToday) % DEFAULT_EXPERIMENTS.length]!;
+      setRemainingToday((prev) => Math.max(0, prev - 1));
       setTurns((t) => [
         ...t,
         {
           role: "coach",
-          text: `Here is a small, quiet practice for today:\n\n“${ex.title}” (${ex.days} days). ${ex.why}`,
+          text: `Here is a small, quiet practice for today:\n\n“${ex.title}” (${ex.days} days).`,
+          source: "fallback",
           experiment: ex,
         },
       ]);
@@ -82,23 +112,38 @@ function Coach() {
   };
 
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="mx-auto max-w-xl pb-12">
       <div className="paper-card animate-rise p-6">
-        <header className="flex items-center justify-between border-b border-sand pb-4">
+        <header className="flex flex-col gap-3 border-b border-sand pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="grid size-11 place-items-center rounded-full bg-stamp-soft text-stamp-ink">
-              <Sparkles className="size-5" />
+              <Sparkles className="size-5 text-stamp" />
             </div>
             <div>
               <h1 className="font-serif text-2xl font-bold text-ink">AI Life Coach</h1>
-              <p className="text-xs text-ink-muted">Three messages today · No scrolling advice</p>
+              <p className="text-xs text-ink-muted">Three messages today · Proposes offline experiments</p>
             </div>
           </div>
-          <span className="rounded-full bg-sand/60 px-3 py-1 font-mono text-xs font-semibold text-ink">
-            {coachLeft} / 3 left
-          </span>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMakeWeeklyLetter}
+              disabled={loadingLetter}
+              className="gap-1.5 border-sand bg-paper-raised text-xs text-ink hover:bg-sand/30"
+            >
+              <Mail className="size-3.5 text-stamp" />
+              <span>{loadingLetter ? "Writing…" : "Make my weekly letter"}</span>
+            </Button>
+
+            <span className="rounded-full bg-sand/60 px-3 py-1 font-mono text-xs font-semibold text-ink">
+              {remainingToday} / 3 left
+            </span>
+          </div>
         </header>
 
+        {/* Conversation Stream */}
         <div className="my-6 space-y-4">
           {turns.map((t, i) => (
             <div
@@ -122,17 +167,30 @@ function Coach() {
                 )}
               >
                 <p className="whitespace-pre-line">{t.text}</p>
+
+                {/* Returned Experiment as a Card (Title + Days) */}
                 {t.experiment && (
-                  <div className="mt-3 rounded-xl border border-sand bg-paper/60 p-3">
-                    <p className="flex items-center gap-1.5 font-bold text-ink">
-                      <FlaskConical className="size-4 text-moss" /> {t.experiment.title}
-                    </p>
-                    <p className="mt-1 text-xs text-ink-muted">{t.experiment.why}</p>
+                  <div className="mt-3 rounded-xl border border-moss/30 bg-moss/10 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="flex items-center gap-1.5 font-bold text-moss-ink">
+                        <FlaskConical className="size-4 text-moss shrink-0" />
+                        <span>{t.experiment.title}</span>
+                      </p>
+                      <span className="shrink-0 rounded-full bg-moss/20 px-2.5 py-0.5 font-mono text-xs font-semibold text-moss-ink">
+                        {t.experiment.days} {t.experiment.days === 1 ? "day" : "days"}
+                      </span>
+                    </div>
+                    {t.experiment.why && (
+                      <p className="mt-1.5 text-xs text-ink-muted leading-normal">
+                        {t.experiment.why}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           ))}
+
           {thinking && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <span className="size-2 animate-pulse rounded-full bg-stamp" />
@@ -141,34 +199,70 @@ function Coach() {
           )}
         </div>
 
-        {dynamicSummary && (
-          <div className="my-4 rounded-xl border border-moss/30 bg-moss/10 p-3 text-xs text-moss-ink">
-            <span className="font-bold">Summary note:</span> {dynamicSummary}
-          </div>
-        )}
-
+        {/* Message Input Form */}
         <form onSubmit={submit} className="flex gap-2">
           <input
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            disabled={coachLeft === 0 || thinking}
+            disabled={remainingToday === 0 || thinking}
+            maxLength={500}
             placeholder={
-              coachLeft === 0
+              remainingToday === 0
                 ? "No messages left today. Enjoy the world outside."
-                : "Ask for an offline experiment or habit…"
+                : "Ask for an offline experiment or habit (1-500 chars)…"
             }
             className="flex-1 rounded-xl border border-sand bg-paper-raised px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-stamp disabled:opacity-50"
           />
           <Button
             type="submit"
-            disabled={!text.trim() || coachLeft === 0 || thinking}
-            className="rounded-xl bg-stamp text-primary-foreground"
+            disabled={!text.trim() || remainingToday === 0 || thinking}
+            className="rounded-xl bg-stamp text-primary-foreground hover:bg-stamp/90"
           >
             <Send className="size-4" />
           </Button>
         </form>
       </div>
+
+      {/* Weekly Letter Dialog */}
+      <Dialog open={letterOpen} onOpenChange={setLetterOpen}>
+        <DialogContent className="max-w-lg border border-sand bg-paper p-6 text-ink shadow-paper sm:rounded-2xl">
+          <DialogHeader className="border-b border-sand pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <WaxSeal status="sealed" />
+                <div>
+                  <DialogTitle className="font-serif text-xl font-bold">Your Weekly Letter</DialogTitle>
+                  <DialogDescription className="text-xs text-ink-muted">
+                    Private habit reflection · Saved to coach summaries
+                  </DialogDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.print()}
+                className="gap-1 text-xs text-ink-muted hover:text-ink"
+              >
+                <Printer className="size-3.5" /> Print
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="my-4 max-h-[60vh] overflow-y-auto whitespace-pre-line rounded-xl border border-sand bg-paper-raised p-4 font-serif text-sm leading-relaxed text-ink shadow-inner">
+            {letterContent}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setLetterOpen(false)}
+              className="rounded-xl bg-stamp px-4 py-2 text-xs font-semibold text-primary-foreground"
+            >
+              Keep Gentle
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
