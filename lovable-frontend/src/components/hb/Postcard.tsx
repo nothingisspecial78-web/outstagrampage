@@ -1,6 +1,7 @@
 import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Postmark } from "./Postmark";
+import { MediaPostPlayer } from "./MediaPostPlayer";
 import type { Postcard as P } from "@/lib/store";
 
 export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => void; onOpen?: () => void }) {
@@ -8,28 +9,32 @@ export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => v
 
   return (
     <article className="postcard-frame relative mx-auto w-full max-w-xl rounded-sm">
-      <button onClick={onOpen} className="block w-full overflow-hidden rounded-[2px] focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Open postcard from ${card.from}`}>
+      <div className="block w-full overflow-hidden rounded-[2px] focus-visible:outline-2 focus-visible:outline-ring">
         {isVideo ? (
-          <video
+          <MediaPostPlayer
             src={card.img}
-            controls
             autoPlay
             loop
-            muted
-            playsInline
-            className="aspect-[3/2] w-full object-cover"
+            className="aspect-[3/2] w-full"
           />
         ) : (
-          <img
-            src={card.img}
-            alt={`${card.place}, photographed by ${card.from}`}
-            width={1200}
-            height={800}
-            loading="lazy"
-            className="aspect-[3/2] w-full object-cover sepia-[.15]"
-          />
+          <button
+            type="button"
+            onClick={onOpen}
+            className="block w-full cursor-pointer focus:outline-none"
+            aria-label={`Open postcard from ${card.from}`}
+          >
+            <img
+              src={card.img}
+              alt={`${card.place}, photographed by ${card.from}`}
+              width={1200}
+              height={800}
+              loading="lazy"
+              className="aspect-[3/2] w-full object-cover sepia-[.15]"
+            />
+          </button>
         )}
-      </button>
+      </div>
       <Postmark place={card.place} date={card.date} className="absolute -top-3 -right-3 rounded-full bg-paper-raised/80" />
       <div className="flex items-end justify-between gap-4 px-1 pt-3">
         <div className="min-w-0">
