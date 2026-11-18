@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   MapPin,
@@ -52,7 +52,10 @@ export const Route = createFileRoute("/passport")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>): { user?: string } => (typeof s["user"] === "string" ? { user: s["user"] } : {}),
+  validateSearch: (s: Record<string, unknown>): { user?: string; tab?: string } => ({
+    user: typeof s["user"] === "string" ? s["user"] : undefined,
+    tab: typeof s["tab"] === "string" ? s["tab"] : undefined,
+  }),
   component: Profile,
 });
 
@@ -203,7 +206,18 @@ function Profile() {
 
 function MyProfile() {
   const { stamps, hours, session, addStamp } = useStore();
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("rewards");
+  const nav = useNavigate();
+  const search = Route.useSearch();
+  const initialTab = search.tab && TABS.some((t) => t.id === search.tab)
+    ? (search.tab as (typeof TABS)[number]["id"])
+    : "rewards";
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(initialTab);
+
+  useEffect(() => {
+    if (search.tab && TABS.some((t) => t.id === search.tab)) {
+      setTab(search.tab as (typeof TABS)[number]["id"]);
+    }
+  }, [search.tab]);
   const [rewardFilter, setRewardFilter] = useState<"all" | "ready" | "challenges" | "meetups">("all");
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [redeemModal, setRedeemModal] = useState<string | null>(null);
@@ -291,7 +305,7 @@ function MyProfile() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => { setTab(t.id); nav({ search: (prev: any) => ({ ...prev, tab: t.id }), replace: true }); }}
             className={cn(
               "-mt-px flex items-center gap-1.5 border-t py-4 text-xs font-semibold tracking-wider uppercase whitespace-nowrap transition-colors",
               tab === t.id ? "border-stamp text-stamp font-bold" : "border-transparent text-ink-muted hover:text-ink"

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock } from "lucide-react";
+import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStore } from "@/lib/store";
@@ -46,11 +46,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const isAdmin = session?.role === "admin";
   const path = useLocation({ select: (l) => l.pathname });
+  const search = useLocation({ select: (l) => l.search as Record<string, string | undefined> });
   const [panel, setPanel] = useState<Panel>(null);
   const [seenNotes, setSeenNotes] = useState(false);
   const unread = 2;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
   const on = (to: string) => panel === null && (to === "/" ? path === "/" : path.startsWith(to));
+  const isRewardsActive = on("/passport") && (search?.tab === "rewards" || (!search?.tab && !path.startsWith("/passport/")));
+  const isPassportActive = on("/passport") && search?.tab === "stamps";
   const collapsed = panel !== null;
 
   const item = (label: string, icon: ReactNode, active: boolean, extra?: ReactNode) => (
@@ -78,7 +81,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link to="/chats" className="group" onClick={() => setPanel(null)}>{item("Messages", <Send className="size-6" />, on("/chats"), badge)}</Link>
           <button className="group text-left" onClick={() => toggle("search")}>{item("Search", <Search className="size-6" />, panel === "search")}</button>
           <Link to="/capture" className="group" onClick={() => setPanel(null)}>{item("Create", <PlusSquare className="size-6" />, on("/capture"))}</Link>
-          <Link to="/passport" className="group" onClick={() => setPanel(null)}>{item("Passport", <Avatar src={ME.avatar} size="size-6" className={cn(on("/passport") && "rounded-full ring-2 ring-ink")} />, on("/passport"))}</Link>
+          <Link to="/passport" search={{ tab: "rewards" }} className="group" onClick={() => setPanel(null)}>{item("Rewards", <Gift className={cn("size-6", isRewardsActive && "text-stamp stroke-[2.5]")} />, isRewardsActive)}</Link>
+          <Link to="/passport" search={{ tab: "stamps" }} className="group" onClick={() => setPanel(null)}>{item("Passport", <Avatar src={ME.avatar} size="size-6" className={cn(isPassportActive && "rounded-full ring-2 ring-ink")} />, isPassportActive)}</Link>
           <div className="mt-auto flex flex-col gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger className="group text-left outline-none">{item("More", <Menu className="size-6" />, false)}</DropdownMenuTrigger>
@@ -261,8 +265,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <li><Link to="/" aria-label="Home" onClick={() => setPanel(null)}><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
           <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
           <li><Link to="/capture" aria-label="Capture" className="-mt-5 grid size-12 place-items-center rounded-full bg-stamp text-primary-foreground shadow-postcard"><PlusSquare className="size-6" /></Link></li>
-          <li><Link to="/chats" aria-label="Chats" className="relative"><Send className={cn("size-6", on("/chats") && "stroke-[3]")} />{badge}</Link></li>
-          <li><Link to="/passport" aria-label="Passport"><Avatar src={ME.avatar} size="size-6" className={cn("rounded-full", on("/passport") && "ring-2 ring-ink")} /></Link></li>
+          <li><Link to="/passport" search={{ tab: "rewards" }} aria-label="Rewards" onClick={() => setPanel(null)}><Gift className={cn("size-6 transition-all", isRewardsActive ? "stroke-[2.5] text-stamp" : "text-ink")} /></Link></li>
+          <li><Link to="/passport" search={{ tab: "stamps" }} aria-label="Passport" onClick={() => setPanel(null)}><Avatar src={ME.avatar} size="size-6" className={cn("rounded-full transition-all", isPassportActive && "ring-2 ring-ink")} /></Link></li>
         </ul>
       </nav>
     </div>
