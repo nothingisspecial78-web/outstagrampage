@@ -53,6 +53,7 @@ function Coach() {
   const [letterContent, setLetterContent] = useState<string>("");
   const [loadingLetter, setLoadingLetter] = useState(false);
 
+  // Sync remaining messages with store or quota
   useEffect(() => {
     const quotaRemaining = getCoachRemainingCount();
     setRemainingToday(Math.min(coachLeft, quotaRemaining));
@@ -97,178 +98,151 @@ function Coach() {
       if (res.source === "fallback") {
         toast.info("Offline rule fallback engaged.");
       }
-    } catch {
+    } catch (err: any) {
       setThinking(false);
-      const nextRemaining = Math.max(0, remainingToday - 1);
-      setRemainingToday(nextRemaining);
-      const ex = DEFAULT_EXPERIMENTS[(3 - nextRemaining) % DEFAULT_EXPERIMENTS.length]!;
-      setTurns((t) => [
-        ...t,
-        {
-          role: "coach",
-          text: `Here is a small, quiet practice for today:\n\n“${ex.title}” (${ex.days} days).`,
-          source: "fallback",
-          experiment: ex,
-        },
-      ]);
+      toast.error("Error communicating with Coach. Offline guidance active.");
     }
   };
 
   return (
-    <div className="mx-auto max-w-xl pb-12">
-      <div className="paper-card animate-rise p-6">
-        <header className="flex flex-col gap-3 border-b border-sand pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-full bg-stamp-soft text-stamp-ink">
-              <Sparkles className="size-5 text-stamp" />
-            </div>
-            <div>
-              <h1 className="font-serif text-2xl font-bold text-ink">AI Life Coach</h1>
-              <p className="text-xs text-ink-muted">Three messages today · Proposes offline experiments</p>
-            </div>
+    <div className="mx-auto max-w-xl space-y-4">
+      <header className="flex items-start justify-between border-b border-sand pb-4">
+        <div className="flex items-center gap-3">
+          <span className="grid size-12 place-items-center rounded-2xl bg-stamp-soft text-stamp shadow-postcard">
+            <Sparkles className="size-6" />
+          </span>
+          <div>
+            <h1 className="font-serif text-2xl font-bold text-ink">AI Life Coach</h1>
+            <p className="text-xs text-ink-muted">
+              Three messages today · Proposes offline experiments
+            </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleMakeWeeklyLetter}
-              disabled={loadingLetter}
-              className="gap-1.5 border-sand bg-paper-raised text-xs text-ink hover:bg-sand/30"
-            >
-              <Mail className="size-3.5 text-stamp" />
-              <span>{loadingLetter ? "Writing…" : "Make my weekly letter"}</span>
-            </Button>
-
-            <span className="rounded-full bg-sand/60 px-3 py-1 font-mono text-xs font-semibold text-ink">
-              {remainingToday} / 3 left
-            </span>
-          </div>
-        </header>
-
-        <div className="my-6 space-y-4">
-          {turns.map((t, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex gap-3",
-                t.role === "me" ? "justify-end" : "justify-start"
-              )}
-            >
-              {t.role === "coach" && (
-                <div className="grid size-8 shrink-0 place-items-center rounded-full bg-line text-ink">
-                  <Sparkles className="size-4 text-stamp" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed",
-                  t.role === "me"
-                    ? "bg-stamp text-primary-foreground"
-                    : "border border-sand bg-paper-raised text-ink shadow-paper"
-                )}
-              >
-                <p className="whitespace-pre-line">{t.text}</p>
-
-                {t.experiment && (
-                  <div className="mt-3 rounded-xl border border-moss/30 bg-moss/10 p-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="flex items-center gap-1.5 font-bold text-moss-ink">
-                        <FlaskConical className="size-4 text-moss shrink-0" />
-                        <span>{t.experiment.title}</span>
-                      </p>
-                      <span className="shrink-0 rounded-full bg-moss/20 px-2.5 py-0.5 font-mono text-xs font-semibold text-moss-ink">
-                        {t.experiment.days} {t.experiment.days === 1 ? "day" : "days"}
-                      </span>
-                    </div>
-                    {(t.experiment.why || t.experiment.description) && (
-                      <p className="mt-1.5 text-xs text-ink-muted leading-normal">
-                        {t.experiment.why || t.experiment.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {thinking && (
-            <div className="flex items-center gap-2 text-xs text-ink-muted">
-              <span className="size-2 animate-pulse rounded-full bg-stamp" />
-              Coach is drafting an offline experiment…
-            </div>
-          )}
         </div>
 
-        {remainingToday === 0 && (
-          <div className="my-4 rounded-xl border border-sand bg-sand/30 p-4 text-center shadow-subtle animate-rise">
-            <p className="font-serif text-sm italic text-ink">
-              “You have used your 3 check-ins for today. Time to put the screen down and try the experiment.”
-            </p>
-            <p className="mt-1 text-xs text-ink-muted">
-              Step away from your screen and notice the unhurried world around you.
-            </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMakeWeeklyLetter}
+            disabled={loadingLetter}
+            className="border-sand bg-paper text-xs text-ink-muted hover:text-ink"
+          >
+            <Mail className="mr-1.5 size-3.5" />
+            {loadingLetter ? "Writing…" : "Make my weekly letter"}
+          </Button>
+
+          <span className="rounded-full bg-sand/60 px-2.5 py-1 text-center font-mono text-xs font-bold text-ink">
+            {remainingToday} / 3 <span className="block text-[10px] font-sans font-normal text-ink-muted">left</span>
+          </span>
+        </div>
+      </header>
+
+      {/* Conversation timeline */}
+      <div className="space-y-4 min-h-[300px]">
+        {turns.map((t, i) => (
+          <div
+            key={i}
+            className={cn("flex flex-col gap-2", t.role === "me" ? "items-end" : "items-start")}
+          >
+            <div
+              className={cn(
+                "max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-postcard",
+                t.role === "me"
+                  ? "bg-stamp text-primary-foreground"
+                  : "border border-sand bg-paper-raised text-ink"
+              )}
+            >
+              <p>{t.text}</p>
+            </div>
+
+            {/* Structured Experiment Card */}
+            {t.experiment && (
+              <div className="w-[85%] animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="rounded-2xl border-2 border-dashed border-moss/60 bg-moss/10 p-4">
+                  <div className="flex items-center justify-between text-xs font-bold text-moss">
+                    <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                      <FlaskConical className="size-4" /> Offline Experiment
+                    </span>
+                    <span className="rounded-full bg-moss/20 px-2 py-0.5 font-mono">
+                      {t.experiment.days} {t.experiment.days === 1 ? "day" : "days"}
+                    </span>
+                  </div>
+                  <h3 className="mt-2 font-serif text-base font-bold text-ink">
+                    {t.experiment.title}
+                  </h3>
+                  {t.experiment.why && (
+                    <p className="mt-1 text-xs text-ink-muted">{t.experiment.why}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {thinking && (
+          <div className="flex items-center gap-2 text-xs text-ink-muted animate-pulse py-2">
+            <Sparkles className="size-4 text-stamp" />
+            <span>The Coach is pondering an offline experiment…</span>
           </div>
         )}
+      </div>
 
-        <form onSubmit={submit} className="flex gap-2">
+      {/* Form or Limit Reached Notice */}
+      {remainingToday > 0 ? (
+        <form onSubmit={submit} className="flex gap-2 border-t border-sand pt-4">
           <input
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            disabled={remainingToday === 0 || thinking}
+            placeholder="Ask the coach for an experiment or reflection…"
             maxLength={500}
-            placeholder={
-              remainingToday === 0
-                ? "You have used your 3 check-ins for today. Time to put the screen down and try the experiment."
-                : "Ask for an offline experiment or habit (1-500 chars)…"
-            }
-            className="flex-1 rounded-xl border border-sand bg-paper-raised px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-stamp disabled:opacity-50"
+            className="flex-1 rounded-2xl border border-sand bg-paper px-4 py-3 text-sm text-ink outline-none placeholder:text-ink-muted/70 focus:border-stamp focus:bg-paper-raised"
           />
           <Button
             type="submit"
-            disabled={!text.trim() || remainingToday === 0 || thinking}
-            className="rounded-xl bg-stamp text-primary-foreground hover:bg-stamp/90 disabled:opacity-50"
+            disabled={!text.trim() || thinking}
+            className="rounded-2xl bg-stamp text-primary-foreground px-5 shadow-postcard"
           >
             <Send className="size-4" />
           </Button>
         </form>
-      </div>
+      ) : (
+        <div className="rounded-2xl border border-sand bg-paper p-5 text-center text-xs text-ink-muted shadow-sm">
+          <p className="font-semibold text-ink">You have used your 3 check-ins for today.</p>
+          <p className="mt-1">
+            The coach is intentionally limited so you spend less time conversing with an AI and more time walking outside. See you tomorrow.
+          </p>
+        </div>
+      )}
 
+      {/* Weekly Letter Modal */}
       <Dialog open={letterOpen} onOpenChange={setLetterOpen}>
-        <DialogContent className="max-w-lg border border-sand bg-paper p-6 text-ink shadow-paper sm:rounded-2xl">
-          <DialogHeader className="border-b border-sand pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <WaxSeal className="size-8" />
-                <div>
-                  <DialogTitle className="font-serif text-xl font-bold">Your Weekly Letter</DialogTitle>
-                  <DialogDescription className="text-xs text-ink-muted">
-                    Private habit reflection · Saved to coach summaries
-                  </DialogDescription>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => window.print()}
-                className="gap-1 text-xs text-ink-muted hover:text-ink"
-              >
-                <Printer className="size-3.5" /> Print
-              </Button>
-            </div>
+        <DialogContent className="max-w-lg border-sand bg-paper-raised p-6 shadow-postcard">
+          <DialogHeader className="items-center text-center">
+            <WaxSeal initial="H" tone="moss" className="size-14 mb-2" />
+            <DialogTitle className="font-serif text-2xl font-bold text-ink">
+              Your Private Weekly Letter
+            </DialogTitle>
+            <DialogDescription className="text-xs text-ink-muted">
+              Generated privately from your local quest logs, stamps, meetups and creations.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="my-4 max-h-[60vh] overflow-y-auto whitespace-pre-line rounded-xl border border-sand bg-paper-raised p-4 font-serif text-sm leading-relaxed text-ink shadow-inner">
+          <div className="mt-4 max-h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-sand/70 bg-paper p-5 font-serif text-sm leading-relaxed text-ink shadow-inner">
             {letterContent}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="mt-4 flex justify-between items-center text-xs text-ink-muted">
+            <span>Never shared · Never ranked</span>
             <Button
-              onClick={() => setLetterOpen(false)}
-              className="rounded-xl bg-stamp px-4 py-2 text-xs font-semibold text-primary-foreground"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                window.print();
+              }}
+              className="border-sand bg-paper text-ink"
             >
-              Keep Gentle
+              <Printer className="mr-1.5 size-3.5" /> Print Letter
             </Button>
           </div>
         </DialogContent>
