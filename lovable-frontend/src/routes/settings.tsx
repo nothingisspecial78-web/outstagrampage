@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { ChevronRight, UserRound, Bell, Lock, Copy, UserPlus, LogOut, ShieldCheck, FlaskConical, Timer, Footprints, KeyRound, Sparkles, Hammer, Users, MapPinned, Store } from "lucide-react";
+import { ChevronRight, UserRound, Bell, Lock, Copy, UserPlus, LogOut, ShieldCheck, FlaskConical, Timer, Footprints, KeyRound, Sparkles, Hammer, Users, MapPinned, Store, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,31 +82,68 @@ function Settings() {
         <Row icon={Timer} label="Slow moments" hint="Pause ~3s on each postcard" right={<Switch checked={dwell} onCheckedChange={setDwell} aria-label="Slow moments" />} />
       </Group>
 
-      <Group title="More">
-        <div className="grid grid-cols-4 gap-1 p-2">
-          {([["/quest", "Quest", Footprints], ["/meet", "Meet", KeyRound], ["/coach", "Coach", Sparkles], ["/make", "Maker", Hammer], ["/group", "Group", Users], ["/map", "Map", MapPinned], ["/places", "Places", Store]] as const).map(([to, l, I]) => (
-            <Link key={to} to={to} className="flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs font-semibold text-ink hover:bg-line"><I className="size-5 text-stamp-ink" />{l}</Link>
-          ))}
-        </div>
+      <Group title="About & Policies">
+        <Link to="/terms" className="flex w-full items-center gap-3 px-4 py-3.5 hover:bg-line/60">
+          <FileText className="size-5 text-ink" />
+          <span className="flex-1 text-left">
+            <span className="block text-sm font-medium text-ink">Terms of Service</span>
+            <span className="block text-xs text-ink-muted">The anti-addiction pact & presence rules</span>
+          </span>
+          <ChevronRight className="size-4 text-ink-muted" />
+        </Link>
+        <Link to="/privacy" className="flex w-full items-center gap-3 px-4 py-3.5 hover:bg-line/60">
+          <Lock className="size-5 text-ink" />
+          <span className="flex-1 text-left">
+            <span className="block text-sm font-medium text-ink">Privacy Policy</span>
+            <span className="block text-xs text-ink-muted">Zero tracking, no ad brokers, encrypted storage</span>
+          </span>
+          <ChevronRight className="size-4 text-ink-muted" />
+        </Link>
       </Group>
 
-      <div className="overflow-hidden rounded-2xl border border-sand bg-paper-raised">
-        <button onClick={() => { signOut(); navigate({ to: "/login" }); }} className="flex w-full items-center gap-3 px-4 py-3.5 text-sm font-semibold text-badge hover:bg-line/60"><LogOut className="size-5" /> Log out</button>
-      </div>
+      <Button variant="outline" className="w-full text-destructive hover:bg-destructive/10" onClick={() => { signOut(); navigate({ to: "/login" }); }}><LogOut /> Log out</Button>
 
-      <Dialog open={modal !== null} onOpenChange={(o) => !o && setModal(null)}>
-        <DialogContent className="rounded-2xl border-sand bg-paper-raised">
-          <DialogHeader><DialogTitle>{modal === "profile" ? "Edit profile" : modal === "notify" ? "Notifications" : "Privacy & Security"}</DialogTitle></DialogHeader>
-          {modal === "profile" && (
-            <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); toast.success("Profile saved"); setModal(null); }}>
-              <div className="flex items-center gap-3"><Avatar src={ME.avatar} size="size-14" /><span className="text-sm font-semibold text-link">Change photo (camera only)</span></div>
-              <label className="block text-sm font-medium text-ink">Name<Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 bg-paper" /></label>
-              <label className="block text-sm font-medium text-ink">Bio<Input value={bio} maxLength={150} onChange={(e) => setBio(e.target.value)} className="mt-1 bg-paper" /></label>
-              <Button type="submit" className="w-full">Save</Button>
-            </form>
-          )}
-          {modal === "notify" && <div className="divide-y divide-line">{["Messages", "Meetup reminders", "Thank-you notes"].map((k) => <div key={k} className="flex items-center justify-between py-3 text-sm text-ink">{k}{T(k)}</div>)}<p className="pt-3 text-xs text-ink-muted">Outstagram never sends "come back" nudges.</p></div>}
-          {modal === "privacy" && <div className="divide-y divide-line">{["Private account", "Hide activity status", "Only friends can message"].map((k) => <div key={k} className="flex items-center justify-between py-3 text-sm text-ink">{k}{T(k)}</div>)}</div>}
+      {/* Edit Profile Modal */}
+      <Dialog open={modal === "profile"} onOpenChange={(o) => !o && setModal(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Edit Profile</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div><label className="text-xs font-bold text-ink-muted">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
+            <div><label className="text-xs font-bold text-ink-muted">Bio</label><Input value={bio} onChange={(e) => setBio(e.target.value)} className="mt-1" /></div>
+            <Button onClick={() => { toast.success("Profile saved"); setModal(null); }} className="w-full">Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notification Modal */}
+      <Dialog open={modal === "notify"} onOpenChange={(o) => !o && setModal(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Notification Preferences</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            {["Messages", "Meetup reminders", "Thank-you notes"].map((k) => (
+              <div key={k} className="flex items-center justify-between">
+                <div><p className="text-sm font-semibold text-ink">{k}</p><p className="text-xs text-ink-muted">Notify only when important</p></div>
+                {T(k)}
+              </div>
+            ))}
+            <Button onClick={() => { toast.success("Preferences saved"); setModal(null); }} className="w-full">Done</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Privacy Modal */}
+      <Dialog open={modal === "privacy"} onOpenChange={(o) => !o && setModal(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Privacy & Security</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            {["Private account", "Hide activity status", "Only friends can message"].map((k) => (
+              <div key={k} className="flex items-center justify-between">
+                <div><p className="text-sm font-semibold text-ink">{k}</p><p className="text-xs text-ink-muted">Protected under zero-tracking policy</p></div>
+                {T(k)}
+              </div>
+            ))}
+            <Button onClick={() => { toast.success("Privacy settings saved"); setModal(null); }} className="w-full">Save</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

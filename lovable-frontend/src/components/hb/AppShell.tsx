@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut } from "lucide-react";
+import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStore } from "@/lib/store";
@@ -47,7 +47,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isAdmin = session?.role === "admin";
   const path = useLocation({ select: (l) => l.pathname });
   const [panel, setPanel] = useState<Panel>(null);
-  const [tray, setTray] = useState(false);
   const [seenNotes, setSeenNotes] = useState(false);
   const unread = 2;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
@@ -88,7 +87,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <DropdownMenuItem key={m.to} asChild className="rounded-lg p-3"><Link to={m.to}><m.icon className="size-5" />{m.label}</Link></DropdownMenuItem>
                 ))}
                 {isAdmin && <DropdownMenuItem asChild className="rounded-lg p-3 font-semibold text-stamp-ink"><Link to="/admin"><ShieldCheck className="size-5" />Admin console</Link></DropdownMenuItem>}
-                <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-3"><LogOut className="size-5" />Log out {session?.name.split(" ")[0]}</DropdownMenuItem>
+                <div className="my-1 border-t border-sand" />
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/terms"><FileText className="size-4" />Terms of Service</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/privacy"><Lock className="size-4" />Privacy Policy</Link></DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-3"><LogOut className="size-5" />Log out {session?.name ? session.name.split(" ")[0] : ""}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Link to="/meet" className="group">{item("From Hereabouts", <LayoutGrid className="size-6" />, false)}</Link>
@@ -177,6 +179,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </Link>
                 )}
                 <div className="my-2 border-t border-sand" />
+                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Policies</p>
+                <Link
+                  to="/terms"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                >
+                  <FileText className="size-4" />
+                  <span>Terms of Service</span>
+                </Link>
+                <Link
+                  to="/privacy"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                >
+                  <Lock className="size-4" />
+                  <span>Privacy Policy</span>
+                </Link>
+                <div className="my-2 border-t border-sand" />
                 <button
                   type="button"
                   onClick={() => {
@@ -216,80 +236,67 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className={cn("md:pl-[72px] xl:pl-[244px]", collapsed && "xl:pl-[244px]")}>
-        <div className={cn("mx-auto w-full max-w-[960px] pb-20 md:pt-6 md:pb-10", path === "/" ? "px-0 sm:px-4" : "px-4 pt-5 sm:px-6")}>{children}</div>
+        <div className={cn("mx-auto w-full max-w-[960px] pb-20 md:pt-6 md:pb-10", path === "/" ? "px-0 sm:px-4" : "px-4 pt-5 sm:px-6")}>
+          {children}
+          <footer className="mt-16 border-t border-sand/60 pt-6 pb-4 text-center text-xs text-ink-muted">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+              <Link to="/terms" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Terms of Service</Link>
+              <span>·</span>
+              <Link to="/privacy" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Privacy Policy</Link>
+              <span>·</span>
+              <Link to="/places" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Places</Link>
+              <span>·</span>
+              <Link to="/passport" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Rewards & Stamps</Link>
+              <span>·</span>
+              <span>Outstagram © 2026</span>
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink-muted/70">Anti-algorithm · Pro-presence · Zero tracking ads</p>
+          </footer>
+        </div>
       </main>
 
       {/* Mobile bottom nav */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-sand bg-paper-raised pb-[env(safe-area-inset-bottom)] md:hidden">
-        <ul className="grid h-12 grid-cols-5 place-items-center">
-          <li><Link to="/" aria-label="Home" onClick={() => setPanel(null)}><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
-          <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
-          <li><Link to="/capture" aria-label="Capture" className="-mt-5 grid size-12 place-items-center rounded-full bg-stamp text-primary-foreground shadow-postcard"><PlusSquare className="size-6" /></Link></li>
-          <li><Link to="/chats" aria-label="Chats" className="relative"><Send className={cn("size-6", on("/chats") && "stroke-[3]")} />{badge}</Link></li>
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-sand bg-paper-raised md:hidden" aria-label="Mobile">
+        <ul className="flex h-12 items-center justify-around">
+          <li><Link to="/" aria-label="Home"><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
+          <li><Link to="/rack" aria-label="Rack"><Clapperboard className="size-6" /></Link></li>
+          <li><Link to="/capture" aria-label="Create"><PlusSquare className="size-6" /></Link></li>
           <li><Link to="/passport" aria-label="Passport"><Avatar src={ME.avatar} size="size-6" className={cn("rounded-full", on("/passport") && "ring-2 ring-ink")} /></Link></li>
         </ul>
       </nav>
-
-      {/* Floating messenger pill */}
-      <div className="fixed right-6 bottom-6 z-30 hidden md:block">
-        {tray && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 absolute right-0 bottom-16 w-80 overflow-hidden rounded-2xl border border-sand bg-paper-raised shadow-postcard">
-            <p className="border-b border-sand px-4 py-3 font-bold text-ink">Messages</p>
-            {chats.map((c, i) => (
-              <Link key={c.id} to="/chats/$id" params={{ id: c.id }} onClick={() => setTray(false)} className="flex items-center gap-3 px-4 py-3 hover:bg-line">
-                <Avatar src={PEOPLE[i]!.avatar} size="size-11" />
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{c.name}</span><span className="block truncate text-xs text-ink-muted">{c.messages.at(-1)?.text}</span></span>
-                <span className="text-[11px] text-ink-muted">{c.messages.length}/{c.limit}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-        <button onClick={() => setTray((t) => !t)} className="flex items-center gap-3 rounded-full border border-sand bg-paper-raised py-3 pr-3 pl-5 shadow-postcard transition-transform hover:scale-[1.02]">
-          <span className="relative"><Send className="size-6" />{badge}</span>
-          <span className="font-semibold text-ink">Messages</span>
-          <span className="flex -space-x-2">{PEOPLE.slice(0, 3).map((p) => <Avatar key={p.handle} src={p.avatar} size="size-6" className="rounded-full ring-2 ring-paper-raised" />)}</span>
-        </button>
-      </div>
     </div>
   );
 }
 
 function SearchPanel({ onPick }: { onPick: () => void }) {
   const [q, setQ] = useState("");
-  const all = searchPeople(q);
+  const res = searchPeople(q);
   return (
-    <div>
-      <div className="px-6 pb-4">
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, handle or friend code" className="h-10 w-full rounded-lg bg-line px-4 text-sm text-ink outline-none placeholder:text-ink-muted" />
+    <div className="p-4">
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search members"
+          className="w-full rounded-xl border border-sand bg-paper py-2.5 pl-9 pr-3 text-sm text-ink outline-none placeholder:text-ink-muted/70 focus:border-stamp focus:bg-paper-raised"
+          autoFocus
+        />
       </div>
-      <div className="border-t border-sand px-3 pt-3">
-        <p className="px-3 pb-2 font-bold text-ink">{q ? "Results" : "Recent"}</p>
-        {all.slice(0, 8).map((p) => (
-          <Link key={p.handle} to="/passport" search={{ user: p.handle }} onClick={onPick} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-line">
-            <Avatar src={p.avatar} size="size-11" />
-            <span><span className="block text-sm font-semibold text-ink">{p.handle}</span><span className="text-sm text-ink-muted">{p.name}</span></span>
-          </Link>
+      <p className="px-2 text-xs font-bold uppercase tracking-wider text-ink-muted">{q ? "Results" : "Suggested"}</p>
+      <ul className="mt-2 divide-y divide-line">
+        {res.map((p) => (
+          <li key={p.handle}>
+            <Link to="/passport" search={{ user: p.handle }} onClick={onPick} className="flex items-center gap-3 p-2 hover:bg-line rounded-lg">
+              <Avatar src={p.avatar} size="size-10" />
+              <div className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-ink">{p.name}</span>
+                <span className="block truncate text-xs text-ink-muted">@{p.handle}</span>
+              </div>
+            </Link>
+          </li>
         ))}
-        {all.length === 0 && <p className="px-3 py-6 text-sm text-ink-muted">No results found.</p>}
-      </div>
+      </ul>
     </div>
   );
-}
-
-export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
-  return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        {eyebrow && <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stamp-ink">{eyebrow}</p>}
-        <h1 className="mt-1 text-3xl font-extrabold text-ink sm:text-4xl">{title}</h1>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-export function CharCount({ value, min = 8, max = 140 }: { value: string; min?: number; max?: number }) {
-  const n = value.trim().length;
-  const ok = n >= min && n <= max;
-  return <span className={cn("text-xs tabular-nums", ok ? "text-moss" : "text-ink-muted")}>{n}/{max}{n > 0 && n < min ? ` · ${min - n} more` : ""}</span>;
 }
