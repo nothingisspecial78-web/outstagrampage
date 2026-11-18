@@ -32,7 +32,7 @@ function greeting() {
 }
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-  <section className={cn("rounded-2xl border border-sand bg-paper-raised p-5 shadow-paper", className)}>{children}</section>
+  <section className={cn("rounded-2xl border border-sand bg-paper-raised p-5 shadow-paper overflow-hidden break-words", className)}>{children}</section>
 );
 
 function Today() {
@@ -43,15 +43,15 @@ function Today() {
 
   return (
     <div className="space-y-5 px-4 pt-5 sm:px-0 md:pt-0">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
           <p className="font-hand text-2xl text-stamp-ink">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-          <h1 className="font-serif text-4xl font-semibold text-ink sm:text-5xl">{greeting()}, {first}.</h1>
-          <p className="mt-1 text-ink-muted">Post less. Go somewhere. Meet someone.</p>
+          <h1 className="font-serif text-3xl font-semibold text-ink sm:text-5xl leading-tight break-words">{greeting()}, {first}.</h1>
+          <p className="mt-1 text-sm sm:text-base text-ink-muted">Post less. Go somewhere. Meet someone.</p>
         </div>
-        <div className="flex items-center gap-3 rounded-2xl bg-ink px-5 py-3 text-paper-raised shadow-postcard">
-          <Hourglass className="size-7 text-stamp-glow" />
-          <div><p className="font-serif text-3xl font-semibold leading-none tabular-nums">{hours}h</p><p className="text-xs opacity-75">reclaimed from scrolling</p></div>
+        <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-ink px-4 py-2.5 sm:px-5 sm:py-3 text-paper-raised shadow-postcard self-start sm:self-auto">
+          <Hourglass className="size-6 sm:size-7 text-stamp-glow" />
+          <div><p className="font-serif text-2xl sm:text-3xl font-semibold leading-none tabular-nums">{hours}h</p><p className="text-[11px] sm:text-xs opacity-75">reclaimed from scrolling</p></div>
         </div>
       </header>
 
@@ -60,8 +60,8 @@ function Today() {
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
           <div className="flex items-center justify-between"><h2 className="font-serif text-xl font-semibold text-ink">Today's rack</h2><span className="text-sm text-ink-muted">{left} of {activeRack.length} left</span></div>
-          <div className="mt-4 flex -space-x-6">
-            {activeRack.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-24 rounded-sm border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-3" : "-rotate-3")} />)}
+          <div className="mt-4 flex -space-x-4 sm:-space-x-6 overflow-hidden py-1">
+            {activeRack.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-20 sm:w-24 shrink-0 rounded-sm border-2 sm:border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-2" : "-rotate-2")} />)}
           </div>
           <p className="mt-4 text-sm text-ink-muted">{left ? "Ten postcards from friends, sideways, then it ends." : "You've seen everything. Go outside."}</p>
           <Link to="/rack" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground">Open today's rack <ArrowRight className="size-4" /></Link>

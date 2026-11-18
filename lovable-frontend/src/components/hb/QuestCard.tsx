@@ -21,7 +21,7 @@ export function QuestCard() {
   const R = 52, C = 2 * Math.PI * R;
 
   return (
-      <section className="rounded-3xl bg-gradient-hero p-[2px] shadow-postcard">
+      <section className="rounded-3xl bg-gradient-hero p-[2px] shadow-postcard w-full max-w-full overflow-hidden">
         <div className="rounded-[calc(1.5rem-2px)] bg-paper-raised p-5 sm:p-7">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold tracking-wider text-stamp-ink uppercase"><Footprints className="size-3.5" /> Today's quest</span>

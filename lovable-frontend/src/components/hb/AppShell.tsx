@@ -66,7 +66,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dot = !seenNotes && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-badge ring-2 ring-paper-raised" />;
 
   return (
-    <div className="min-h-screen bg-paper-raised">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-paper-raised">
       {demo && <div role="status" className="sticky top-0 z-50 bg-demo py-1.5 text-center text-xs font-bold tracking-widest text-demo-foreground">DEMO MODE: location check simulated</div>}
 
       {/* Desktop / tablet rail */}
@@ -277,7 +277,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-sand bg-paper-raised px-4 md:hidden">
+      <header className="sticky top-0 z-30 flex h-[60px] w-full max-w-full items-center justify-between border-b border-sand bg-paper-raised px-4 md:hidden">
         <Link to="/"><Wordmark className="text-[30px]" /></Link>
         <div className="flex items-center gap-3">
           {isAdmin && <Link to="/admin" aria-label="Admin console" className="flex items-center justify-center min-h-[44px] min-w-[44px] text-stamp-ink"><ShieldCheck className="size-6" /></Link>}
@@ -294,7 +294,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className={cn("md:pl-[72px] xl:pl-[244px]", collapsed && "xl:pl-[244px]")}>
+      <main className={cn("w-full max-w-full overflow-x-hidden md:pl-[72px] xl:pl-[244px]", collapsed && "xl:pl-[244px]")}>
         <div className={cn("mx-auto w-full max-w-[960px] pb-20 md:pt-6 md:pb-10", path === "/" ? "px-0 sm:px-4" : "px-4 pt-5 sm:px-6")}>
           {children}
           <footer className="mt-16 border-t border-sand/60 pt-6 pb-4 text-center text-xs text-ink-muted">
@@ -317,7 +317,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-sand bg-paper-raised pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 w-full max-w-full border-t border-sand bg-paper-raised pb-[env(safe-area-inset-bottom)] md:hidden">
         <ul className="grid h-12 grid-cols-5 place-items-center">
           <li><Link to="/" aria-label="Home" onClick={() => setPanel(null)}><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
           <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
