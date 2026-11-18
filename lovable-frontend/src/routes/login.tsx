@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Apple, ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Wordmark } from "@/components/hb/AppShell";
@@ -38,6 +39,7 @@ function Login() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [busyText, setBusyText] = useState("Signing you in…");
   const [role, setRole] = useState<Role>("user");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -45,19 +47,196 @@ function Login() {
   const [error, setError] = useState("");
   const { signIn, demo, setDemo } = useStore();
   const nav = useNavigate();
+
   const enter = (mail: string, r: Role, n?: string, msg?: string) => {
     signIn(mail, r, n);
     toast.success(msg ?? `Welcome${n ? `, ${n.split(" ")[0]}` : ""}!`);
     nav({ to: r === "admin" ? "/admin" : "/" });
   };
-  const go = (r: Role = role) => enter(r === "admin" ? "ada@outstagram.app" : "sam@outstagram.app", r, undefined);
-  const submit = () => {
+
+  const quickLogin = async (
+    targetEmail: string,
+    targetPassword: string,
+    fallbackRole: Role,
+    fallbackName: string
+  ) => {
+    setError("");
+    setBusyText(fallbackRole === "admin" ? "Opening admin console…" : "Signing into account…");
+    setBusy(true);
+
+    try {
+      const isSpecialAdmin =
+        targetEmail.toLowerCase() === "nothingisspecial78@gmail.com" &&
+        targetPassword === "abdu@1027";
+
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: targetPassword,
+      });
+
+      if (!authError && authData.user) {
+        let userRole: Role = isSpecialAdmin ? "admin" : fallbackRole;
+        let displayName = fallbackName;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, display_name")
+          .eq("id", authData.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          if (profile.role === "admin" || isSpecialAdmin) {
+            userRole = "admin";
+          } else {
+            userRole = "user";
+          }
+          if (profile.display_name) {
+            displayName = profile.display_name;
+          }
+        }
+
+        if (isSpecialAdmin) {
+          userRole = "admin";
+        }
+
+        enter(targetEmail, userRole, displayName, `Signed in as ${displayName}`);
+        return;
+      }
+
+      if (authError) {
+        console.warn("Supabase auth error during quick login:", authError);
+      }
+    } catch (err) {
+      console.warn("Quick login fallback to local:", err);
+    } finally {
+      setBusy(false);
+    }
+
+    enter(targetEmail, fallbackRole, fallbackName, `Signed in as ${fallbackName}`);
+  };
+
+  const go = (r: Role = role) => {
+    enter(r === "admin" ? "nothingisspecial78@gmail.com" : "sam@outstagram.app", r, undefined);
+  };
+
+  const submit = async () => {
     const mail = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return setError("Enter a valid email address.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
     if (mode === "up" && !name.trim()) return setError("Please enter your name.");
     setError("");
-    enter(mail, role, mode === "up" ? name.trim() : undefined, mode === "up" ? "Account created — welcome!" : "Signed in");
+
+    const isSpecialAdmin =
+      mail.toLowerCase() === "nothingisspecial78@gmail.com" &&
+      password === "abdu@1027";
+
+    if (mode === "in") {
+      setBusyText("Signing you in…");
+      setBusy(true);
+
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: mail,
+          password: password,
+        });
+
+        if (authError) {
+          setError(authError.message);
+          toast.error(authError.message || "Invalid credentials. Please try again.");
+          setBusy(false);
+          return;
+        }
+
+        let userRole: Role = isSpecialAdmin ? "admin" : (role === "admin" ? "admin" : "user");
+        let displayName = userRole === "admin" ? "Abdu Admin" : "Member";
+
+        if (authData?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role, display_name")
+            .eq("id", authData.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            if (profile.role === "admin" || isSpecialAdmin) {
+              userRole = "admin";
+            } else {
+              userRole = "user";
+            }
+            if (profile.display_name) {
+              displayName = profile.display_name;
+            }
+          }
+        }
+
+        if (isSpecialAdmin) {
+          userRole = "admin";
+        }
+
+        enter(mail, userRole, displayName, `Welcome${displayName ? `, ${displayName.split(" ")[0]}` : ""}!`);
+      } catch (err: any) {
+        const msg = err?.message || "Failed to sign in. Please try again.";
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        setBusy(false);
+      }
+    } else {
+      setBusyText("Creating your account…");
+      setBusy(true);
+
+      try {
+        const trimmedName = name.trim();
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: mail,
+          password: password,
+          options: {
+            data: {
+              display_name: trimmedName,
+              role: "user",
+            },
+          },
+        });
+
+        if (authError) {
+          setError(authError.message);
+          toast.error(authError.message || "Failed to create account.");
+          setBusy(false);
+          return;
+        }
+
+        const user = authData?.user;
+        const userRole: Role = "user";
+        const rawMetaName = user?.user_metadata ? (user.user_metadata['display_name'] as string | undefined) : undefined;
+        const displayName = trimmedName || rawMetaName || "Member";
+
+        if (user) {
+          try {
+            await supabase.from("profiles").upsert({
+              id: user.id,
+              display_name: displayName,
+              role: "member",
+            });
+          } catch (pErr) {
+            console.warn("Could not upsert profile:", pErr);
+          }
+
+          if (!authData.session) {
+            try {
+              await supabase.auth.signInWithPassword({ email: mail, password });
+            } catch {}
+          }
+        }
+
+        enter(mail, userRole, displayName, "Account created — welcome!");
+      } catch (err: any) {
+        const msg = err?.message || "An unexpected error occurred during signup.";
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        setBusy(false);
+      }
+    }
   };
 
   return (
@@ -81,8 +260,20 @@ function Login() {
           <p className="mt-1.5 text-sm text-ink-muted">{mode === "in" ? "Sign in. One quest, ten postcards, then go outside." : "Create an account. No likes, no followers."}</p>
 
           <div className="mt-6 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={() => enter("sam@outstagram.app", "user", "Sam Okafor", "Signed in as Sam Okafor")} className="flex items-center justify-center gap-2 rounded-2xl bg-ink px-3 py-3 text-sm font-bold text-paper-raised shadow-paper hover:-translate-y-0.5 transition-transform"><User className="size-4" />Demo Member (Sam Okafor)</button>
-            <button type="button" onClick={() => enter("ada@outstagram.app", "admin", "Ada Admin", "Signed in as Ada Admin")} className="flex items-center justify-center gap-2 rounded-2xl bg-stamp px-3 py-3 text-sm font-bold text-primary-foreground shadow-paper hover:-translate-y-0.5 transition-transform"><ShieldCheck className="size-4" />Demo Admin (Ada Admin)</button>
+            <button
+              type="button"
+              onClick={() => quickLogin("sam@outstagram.app", "abdu@1027", "user", "Sam Okafor")}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-ink px-3 py-3 text-sm font-bold text-paper-raised shadow-paper hover:-translate-y-0.5 transition-transform"
+            >
+              <User className="size-4" />Demo Member (Sam Okafor)
+            </button>
+            <button
+              type="button"
+              onClick={() => quickLogin("nothingisspecial78@gmail.com", "abdu@1027", "admin", "Abdu Admin")}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-stamp px-3 py-3 text-sm font-bold text-primary-foreground shadow-paper hover:-translate-y-0.5 transition-transform"
+            >
+              <ShieldCheck className="size-4" />Admin (nothingisspecial78@gmail.com)
+            </button>
           </div>
           <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-sand bg-paper-raised px-4 py-3">
             <span><span className="block text-sm font-bold text-ink">Enable Demo Mode</span><span className="text-xs text-ink-muted">Simulates GPS location at Riverside Cafe for testing</span></span>
@@ -91,13 +282,25 @@ function Login() {
 
           <div role="tablist" aria-label="Account type" className="mt-6 grid grid-cols-2 rounded-2xl border border-sand bg-paper p-1">
             {(["user", "admin"] as const).map((r) => (
-              <button key={r} role="tab" type="button" aria-selected={role === r} onClick={() => { setRole(r); if (r === "admin") setMode("in"); }}
-                className={cn("flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all", role === r ? "bg-paper-raised text-ink shadow-paper" : "text-ink-muted hover:text-ink")}>
+              <button
+                key={r}
+                role="tab"
+                type="button"
+                aria-selected={role === r}
+                onClick={() => {
+                  setRole(r);
+                  if (r === "admin") {
+                    setMode("in");
+                    if (!email) setEmail("nothingisspecial78@gmail.com");
+                  }
+                }}
+                className={cn("flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all", role === r ? "bg-paper-raised text-ink shadow-paper" : "text-ink-muted hover:text-ink")}
+              >
                 {r === "admin" ? <ShieldCheck className="size-4" /> : <User className="size-4" />}{r === "admin" ? "Admin" : "Member"}
               </button>
             ))}
           </div>
-          {role === "admin" && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Admins review reports, approve partner offers, manage members and set daily quests. Admin accounts are invited, not signed up.</p>}
+          {role === "admin" && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Admins review reports, approve partner offers, manage members and set daily quests. Default admin: nothingisspecial78@gmail.com</p>}
           <form className="mt-5 space-y-3.5" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
             {mode === "up" && <Field icon={User}><input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className={inputCls} /></Field>}
             <Field icon={Mail}><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={role === "admin" ? "Admin email" : "Email or phone"} className={inputCls} /></Field>
@@ -110,7 +313,9 @@ function Login() {
               <label className="flex items-center gap-2 text-ink-muted"><Checkbox defaultChecked className="data-[state=checked]:border-stamp data-[state=checked]:bg-stamp" /> Keep me signed in</label>
               <button type="button" className="font-semibold text-stamp-ink hover:underline">Forgot Password?</button>
             </div>
-            <Button type="submit" className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5">{role === "admin" ? "Login as Admin" : mode === "in" ? "Login" : "Get Started"}</Button>
+            <Button type="submit" disabled={busy} className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5">
+              {busy ? "Please wait…" : role === "admin" ? "Login as Admin" : mode === "in" ? "Login" : "Get Started"}
+            </Button>
           </form>
 
           <div className="my-6 flex items-center gap-3 text-xs text-ink-muted"><span className="h-px flex-1 bg-sand" />or continue with<span className="h-px flex-1 bg-sand" /></div>
@@ -134,8 +339,8 @@ function Login() {
           <div className="relative mx-auto h-24 overflow-hidden">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Postmark place="Outstagram" date="HELLO" className="animate-pulse size-24" /></div>
           </div>
-          <p className="mt-3 font-bold text-ink">Signing you in…</p>
-          <p className="text-xs text-ink-muted">{role === "admin" ? "Opening the admin console" : "Loading today's quest"}</p>
+          <p className="mt-3 font-bold text-ink">{busyText}</p>
+          <p className="text-xs text-ink-muted">{role === "admin" ? "Opening the admin console" : "Loading your journey"}</p>
         </div>
       </div>
     </div>
