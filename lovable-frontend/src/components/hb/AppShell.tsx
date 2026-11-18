@@ -256,11 +256,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-sand bg-paper-raised md:hidden" aria-label="Mobile">
-        <ul className="flex h-12 items-center justify-around">
-          <li><Link to="/" aria-label="Home"><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
-          <li><Link to="/rack" aria-label="Rack"><Clapperboard className="size-6" /></Link></li>
-          <li><Link to="/capture" aria-label="Create"><PlusSquare className="size-6" /></Link></li>
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-sand bg-paper-raised pb-[env(safe-area-inset-bottom)] md:hidden">
+        <ul className="grid h-12 grid-cols-5 place-items-center">
+          <li><Link to="/" aria-label="Home" onClick={() => setPanel(null)}><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
+          <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
+          <li><Link to="/capture" aria-label="Capture" className="-mt-5 grid size-12 place-items-center rounded-full bg-stamp text-primary-foreground shadow-postcard"><PlusSquare className="size-6" /></Link></li>
+          <li><Link to="/chats" aria-label="Chats" className="relative"><Send className={cn("size-6", on("/chats") && "stroke-[3]")} />{badge}</Link></li>
           <li><Link to="/passport" aria-label="Passport"><Avatar src={ME.avatar} size="size-6" className={cn("rounded-full", on("/passport") && "ring-2 ring-ink")} /></Link></li>
         </ul>
       </nav>
@@ -270,33 +271,40 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function SearchPanel({ onPick }: { onPick: () => void }) {
   const [q, setQ] = useState("");
-  const res = searchPeople(q);
+  const all = searchPeople(q);
   return (
-    <div className="p-4">
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search members"
-          className="w-full rounded-xl border border-sand bg-paper py-2.5 pl-9 pr-3 text-sm text-ink outline-none placeholder:text-ink-muted/70 focus:border-stamp focus:bg-paper-raised"
-          autoFocus
-        />
+    <div>
+      <div className="px-6 pb-4">
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, handle or friend code" className="h-10 w-full rounded-lg bg-line px-4 text-sm text-ink outline-none placeholder:text-ink-muted" />
       </div>
-      <p className="px-2 text-xs font-bold uppercase tracking-wider text-ink-muted">{q ? "Results" : "Suggested"}</p>
-      <ul className="mt-2 divide-y divide-line">
-        {res.map((p) => (
-          <li key={p.handle}>
-            <Link to="/passport" search={{ user: p.handle }} onClick={onPick} className="flex items-center gap-3 p-2 hover:bg-line rounded-lg">
-              <Avatar src={p.avatar} size="size-10" />
-              <div className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink">{p.name}</span>
-                <span className="block truncate text-xs text-ink-muted">@{p.handle}</span>
-              </div>
-            </Link>
-          </li>
+      <div className="border-t border-sand px-3 pt-3">
+        <p className="px-3 pb-2 font-bold text-ink">{q ? "Results" : "Recent"}</p>
+        {all.slice(0, 8).map((p) => (
+          <Link key={p.handle} to="/passport" search={{ user: p.handle }} onClick={onPick} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-line">
+            <Avatar src={p.avatar} size="size-11" />
+            <span><span className="block text-sm font-semibold text-ink">{p.handle}</span><span className="text-sm text-ink-muted">{p.name}</span></span>
+          </Link>
         ))}
-      </ul>
+        {all.length === 0 && <p className="px-3 py-6 text-sm text-ink-muted">No results found.</p>}
+      </div>
     </div>
   );
+}
+
+export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        {eyebrow && <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stamp-ink">{eyebrow}</p>}
+        <h1 className="mt-1 text-3xl font-extrabold text-ink sm:text-4xl">{title}</h1>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function CharCount({ value, min = 8, max = 140 }: { value: string; min?: number; max?: number }) {
+  const n = value.trim().length;
+  const ok = n >= min && n <= max;
+  return <span className={cn("text-xs tabular-nums", ok ? "text-moss" : "text-ink-muted")}>{n}/{max}{n > 0 && n < min ? ` · ${min - n} more` : ""}</span>;
 }

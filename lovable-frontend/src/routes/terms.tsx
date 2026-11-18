@@ -1,12 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Shield, CheckCircle2, HeartHandshake, EyeOff, Ban } from "lucide-react";
+import { ArrowLeft, Shield, Check, Heart, Sparkles, Footprints, Clock, Lock } from "lucide-react";
+import { Postmark } from "@/components/hb/Postmark";
 import { Wordmark } from "@/components/hb/AppShell";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
       { title: "Terms of Service — Outstagram" },
-      { name: "description", content: "Our terms of service. An anti-addiction pact designed to protect your attention, privacy, and real-world connection." },
+      { name: "description", content: "The calm, anti-addiction Terms of Service for Outstagram. Post less. Go somewhere. Meet someone." },
+      { property: "og:title", content: "Terms of Service — Outstagram" },
+      { property: "og:description", content: "Our pact with you: finite feeds, real world presence, and zero addiction loops." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: TermsPage,
@@ -14,103 +20,85 @@ export const Route = createFileRoute("/terms")({
 
 function TermsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-      {/* Back button & Brand */}
-      <div className="mb-8 flex items-center justify-between border-b border-sand pb-4">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-ink hover:text-stamp-ink transition-colors"
-        >
-          <ArrowLeft className="size-4" /> Back to Home
+    <div className="mx-auto max-w-3xl space-y-8 pb-16 pt-2">
+      <div className="flex items-center justify-between border-b border-sand pb-4">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink">
+          <ArrowLeft className="size-4" /> Back to Outstagram
         </Link>
         <Wordmark className="text-2xl" />
       </div>
 
-      <header className="mb-10">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink uppercase tracking-wider">
-          <Shield className="size-3.5" /> Mutual Agreement
+      <header className="relative rounded-3xl border border-sand bg-paper-raised p-8 shadow-paper">
+        <Postmark place="Terms of Service" date="NOV 2026" tone="moss" className="absolute -top-3 -right-3 size-24" />
+        <span className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-3 py-1 text-xs font-bold text-moss uppercase tracking-wider">
+          <Shield className="size-3.5" /> Human-First Terms
         </span>
-        <h1 className="mt-3 font-serif text-3xl font-extrabold text-ink sm:text-4xl">
-          Terms of Service
+        <h1 className="mt-3 font-serif text-3xl sm:text-4xl font-bold text-ink">
+          Terms of Service: The Anti-Addiction Pact
         </h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Last revised: November 18, 2026 · The Anti-Addiction Pact
+        <p className="mt-2 text-sm text-ink-muted leading-relaxed">
+          Last revised: November 2026. These terms govern your use of Outstagram. Unlike traditional platforms designed to maximize screen time, Outstagram is designed to encourage your departure into the physical world.
         </p>
       </header>
 
-      <div className="prose prose-stone max-w-none space-y-8 text-ink leading-relaxed">
-        {/* Core Principles */}
-        <section className="rounded-2xl border border-sand bg-paper p-6 shadow-sm">
-          <h2 className="flex items-center gap-2.5 font-serif text-xl font-bold text-ink">
-            <HeartHandshake className="size-5 text-stamp-ink" />
-            1. The Anti-Instagram Covenant
+      <div className="space-y-6 text-sm text-ink leading-relaxed">
+        <section className="rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper space-y-3">
+          <h2 className="font-serif text-xl font-bold text-ink flex items-center gap-2">
+            <Sparkles className="size-5 text-stamp" /> 1. Purpose & The Anti-Addiction Mandate
           </h2>
-          <p className="mt-3 text-sm text-ink-muted">
-            Outstagram is built on the belief that human attention is sacred and not for extraction.
-            By using Outstagram, you enter into a shared pact with us:
+          <p>
+            Outstagram is created as a direct antidote to algorithmic hyper-engagement and digital extraction. Our service exists to help you put down your device, walk through your city, support independent neighborhood makers, and gather with other humans in real space.
           </p>
-          <ul className="mt-3 space-y-2 text-sm">
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="size-4 shrink-0 text-moss mt-0.5" />
-              <span><strong>Finite by Design:</strong> We cap your daily feed to 10 postcards. There is no infinite scroll and no infinite refresh. When you reach the end, we urge you to close the screen.</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="size-4 shrink-0 text-moss mt-0.5" />
-              <span><strong>No Algorithmic Manipulation:</strong> We do not rank, score, or sort content to provoke anger, envy, or prolonged dwell time. Postcards are displayed in simple reverse-chronological neighborhood order.</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="size-4 shrink-0 text-moss mt-0.5" />
-              <span><strong>Presence Over Performance:</strong> We deliberately exclude follower counts, public likes, and vanity scoreboards. Engagement metrics are hidden because you are a person, not a profile to optimize.</span>
-            </li>
+          <ul className="list-disc pl-5 space-y-1.5 text-ink-muted">
+            <li><b>Finite Moments:</b> You will never find an infinite scroll, algorithmic recommendations, or variable-reward dopamine loops here. When you reach the end of the rack, we invite you to close the tab.</li>
+            <li><b>Quiet Spaces:</b> No unprompted push notifications, red badges designed to manipulate anxiety, or vanity view counts.</li>
+            <li><b>Presence Over Extraction:</b> All features—from Daily Quests to Passport Stamps—are designed to terminate in offline action.</li>
           </ul>
         </section>
 
-        {/* Real-World Presence & Community Standards */}
-        <section className="rounded-2xl border border-sand bg-paper p-6 shadow-sm">
-          <h2 className="flex items-center gap-2.5 font-serif text-xl font-bold text-ink">
-            <Ban className="size-5 text-stamp-ink" />
-            2. Community Conduct & Real-World Safety
+        <section className="rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper space-y-3">
+          <h2 className="font-serif text-xl font-bold text-ink flex items-center gap-2">
+            <Footprints className="size-5 text-moss" /> 2. Grounded Physical Interactions
           </h2>
-          <p className="mt-3 text-sm text-ink-muted">
-            To ensure physical and digital peace for all members:
+          <p>
+            Members agree to engage thoughtfully with the physical world and respect local communities:
           </p>
-          <ul className="mt-3 space-y-2 text-sm text-ink">
-            <li>• <strong>Consent in Public Spaces:</strong> Postcards should celebrate places, architecture, crafts, nature, and shared moments. Respect strangers’ privacy and never publish identifying photos of individuals without consent.</li>
-            <li>• <strong>No Harassment or Bullying:</strong> We have zero tolerance for hate speech, predatory behavior, or harassment. Violating accounts are immediately reviewed and removed by human moderators.</li>
-            <li>• <strong>Authentic Presence:</strong> Do not spoof your location or automate visits. Quests and stamps are meant to be felt with your own feet and eyes.</li>
+          <ul className="list-disc pl-5 space-y-1.5 text-ink-muted">
+            <li><b>Location Verification:</b> Postcards and stamps can only be stamped when you are physically within range of a location or meetup partner. Spoofing locations or automating check-ins defeats the purpose of the platform and results in account suspension.</li>
+            <li><b>Meetup Respect:</b> When meeting other members offline to unlock chats or share stamps, conduct yourself with basic neighborly kindness and mutual respect.</li>
+            <li><b>Independent Places:</b> Community discounts and stamps are offered in partnership with local neighborhood shops. Respect shop staff and follow house rules.</li>
           </ul>
         </section>
 
-        {/* Offline Experiment & Coach Guidance */}
-        <section className="rounded-2xl border border-sand bg-paper p-6 shadow-sm">
-          <h2 className="flex items-center gap-2.5 font-serif text-xl font-bold text-ink">
-            <EyeOff className="size-5 text-stamp-ink" />
-            3. AI Life Coach Disclaimers
+        <section className="rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper space-y-3">
+          <h2 className="font-serif text-xl font-bold text-ink flex items-center gap-2">
+            <Clock className="size-5 text-stamp" /> 3. Real-World Presence Rewards & Cashouts
           </h2>
-          <p className="mt-3 text-sm text-ink">
-            The Hereabouts AI Life Coach offers calm, offline micro-experiments designed to help you disconnect from digital habits.
-            It is an educational and reflective tool. It is <strong>not a medical, psychological, or crisis therapy provider</strong>. If you are experiencing distress, please reach out to trusted friends, family, or healthcare professionals in your area.
+          <p>
+            Outstagram provides in-app points for stepping outside and meeting friends. Points may be withdrawn for cash or converted into partner store credits:
           </p>
+          <ul className="list-disc pl-5 space-y-1.5 text-ink-muted">
+            <li>Points are awarded for authentic physical dwell time, quest completion, and verified peer-to-peer meetups.</li>
+            <li>Fraudulent verification, automated emulation, or bad-faith point generation will void the accrued balance.</li>
+            <li>Withdrawal requests are processed via ACH, PayPal, or local merchant vouchers within 1–2 business days.</li>
+          </ul>
         </section>
 
-        {/* Account Termination & Freedom */}
-        <section className="rounded-2xl border border-sand bg-paper p-6 shadow-sm">
-          <h2 className="font-serif text-xl font-bold text-ink">
-            4. Freedom to Leave Anytime
+        <section className="rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper space-y-3">
+          <h2 className="font-serif text-xl font-bold text-ink flex items-center gap-2">
+            <Lock className="size-5 text-ink" /> 4. Respect for Privacy & Media
           </h2>
-          <p className="mt-3 text-sm text-ink">
-            You may export your quest reflections, stamps, and postcards or delete your account at any time through Settings. We will never hide the exit door or make leaving painful.
+          <p>
+            You retain ownership of the postcards and creative memories you post. By posting, you grant Outstagram a limited license to render your card in the finite rack for neighbors. You agree never to post unauthorized photographs of children, strangers' faces without consent, or abusive material.
           </p>
         </section>
       </div>
 
-      <footer className="mt-12 border-t border-sand pt-6 text-center text-xs text-ink-muted">
-        <p>© 2026 Outstagram · Post less. Go somewhere. Meet someone.</p>
-        <div className="mt-2 flex justify-center gap-4">
-          <Link to="/privacy" className="hover:text-stamp-ink underline">Privacy Policy</Link>
-          <Link to="/" className="hover:text-stamp-ink underline">Home</Link>
-        </div>
-      </footer>
+      <div className="text-center pt-4 border-t border-sand">
+        <Button asChild className="bg-ink hover:bg-ink/90 text-paper-raised px-8">
+          <Link to="/">I Agree & Return to Outstagram</Link>
+        </Button>
+      </div>
     </div>
   );
 }
