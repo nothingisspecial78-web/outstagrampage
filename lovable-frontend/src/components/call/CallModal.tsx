@@ -39,18 +39,21 @@ export function CallModal() {
   const [speakerMuted, setSpeakerMuted] = useState(false);
   const [pipMinimized, setPipMinimized] = useState(false);
 
+  // Attach local stream to local preview
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream, status]);
 
+  // Attach remote stream to remote video
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, status]);
 
+  // Do not render if idle or only receiving incoming call (incoming call has its own dialog)
   if (status === "idle" || status === "ringing") {
     return null;
   }
@@ -72,6 +75,7 @@ export function CallModal() {
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/90 p-2 sm:p-4 md:p-6 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div className="relative flex h-full max-h-[860px] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-sand/20 bg-ink text-paper shadow-2xl">
+        {/* Top Header Bar */}
         <header className="absolute top-0 right-0 left-0 z-20 flex items-center justify-between bg-gradient-to-b from-ink/90 via-ink/60 to-transparent px-4 py-4 md:px-6">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -94,53 +98,51 @@ export function CallModal() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-serif text-lg font-bold text-paper md:text-xl">{peer?.name || "Friend"}</h2>
-                <span className="rounded-full bg-paper/15 px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase text-paper/80">
-                  {isVideo ? "Video" : "Voice"} Call
+                <span className="hidden items-center gap-1 rounded-full bg-sand/20 px-2 py-0.5 text-[10px] font-semibold text-paper/80 sm:inline-flex">
+                  <ShieldCheck className="size-3 text-emerald-400" /> Peer-to-Peer
                 </span>
               </div>
-              <p className="flex items-center gap-1.5 text-xs text-paper/70">
-                {isConnected ? (
-                  <span className="font-mono text-emerald-400 font-semibold">{formatDuration(duration)}</span>
-                ) : status === "calling" ? (
-                  <span className="animate-pulse text-amber-300 font-medium">Calling…</span>
-                ) : (
-                  <span className="animate-pulse text-blue-300 font-medium">Connecting…</span>
-                )}
-                <span className="text-paper/40">•</span>
-                <span className="flex items-center gap-1 text-[11px] text-paper/60">
-                  <ShieldCheck className="size-3 text-emerald-400" /> End-to-end encrypted
-                </span>
+              <p className="text-xs text-paper/70 font-mono">
+                {status === "calling"
+                  ? "Calling…"
+                  : isConnected
+                  ? `${isVideo ? "Video" : "Audio"} · ${formatDuration(duration)}`
+                  : "Connecting…"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Quick Demo Simulator for Testing if calling */}
             {status === "calling" && (
               <Button
-                variant="outline"
                 size="sm"
+                variant="outline"
                 onClick={simulateAnswer}
-                className="border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 text-xs hidden sm:flex"
+                className="border-sand/40 bg-sand/20 text-xs text-paper hover:bg-sand/30"
               >
-                <Sparkles className="mr-1 size-3.5" /> Demo: Answer
+                <Sparkles className="mr-1 size-3 text-amber-300" /> Simulate Answer
               </Button>
             )}
 
             <Button
-              variant="ghost"
               size="icon"
-              onClick={() => setSpeakerMuted(!speakerMuted)}
-              className="text-paper/80 hover:bg-paper/10 hover:text-paper"
+              variant="ghost"
+              onClick={() => setSpeakerMuted((v) => !v)}
+              className="text-paper/80 hover:bg-sand/20 hover:text-paper"
               aria-label={speakerMuted ? "Unmute speaker" : "Mute speaker"}
             >
-              {speakerMuted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
+              {speakerMuted ? <VolumeX className="size-5 text-rose-400" /> : <Volume2 className="size-5" />}
             </Button>
           </div>
         </header>
 
-        <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-neutral-950">
+        {/* Call Body: Video canvas or audio representation */}
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-gradient-to-b from-stone-900 via-stone-950 to-black">
           {isVideo ? (
+            /* Video Mode */
             <div className="relative h-full w-full">
+              {/* Remote Video Stream or Avatar Placeholder */}
               {isConnected && remoteStream ? (
                 <video
                   ref={remoteVideoRef}
@@ -150,159 +152,156 @@ export function CallModal() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center">
+                <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-center p-6">
                   <div className="relative">
-                    <div className="absolute -inset-4 animate-ping rounded-full bg-stamp/20" />
-                    {peer?.avatar ? (
-                      <img
-                        src={peer.avatar}
-                        alt=""
-                        className="relative size-28 rounded-full border-4 border-sand/30 object-cover shadow-2xl"
-                      />
-                    ) : (
-                      <div className="relative grid size-28 place-items-center rounded-full border-4 border-sand/30 bg-paper/10 font-serif text-4xl text-paper">
-                        {peer?.name?.charAt(0) || "O"}
-                      </div>
-                    )}
+                    <img
+                      src={peer?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"}
+                      alt=""
+                      className="size-32 rounded-full border-4 border-sand/30 object-cover shadow-2xl animate-pulse"
+                    />
+                    <div className="absolute inset-0 rounded-full ring-4 ring-stamp/40 animate-ping" />
                   </div>
                   <div>
-                    <h3 className="font-serif text-2xl font-bold text-paper">{peer?.name || "Friend"}</h3>
-                    <p className="mt-1 text-sm text-paper/70">
-                      {status === "calling" ? "Ringing… Waiting for answer" : "Establishing peer connection…"}
+                    <h3 className="font-serif text-2xl font-bold text-paper">{peer?.name}</h3>
+                    <p className="text-sm text-paper/70 mt-1">
+                      {status === "calling" ? "Waiting for friend to answer…" : "Connecting peer stream…"}
                     </p>
                   </div>
                 </div>
               )}
 
-              <div
-                className={cn(
-                  "absolute right-4 bottom-24 z-30 transition-all duration-300 overflow-hidden rounded-xl border border-paper/20 bg-neutral-900 shadow-2xl",
-                  pipMinimized ? "h-14 w-20" : "h-36 w-28 sm:h-48 sm:w-36 md:h-52 md:w-40"
-                )}
-              >
-                {isCameraOff ? (
-                  <div className="flex h-full w-full flex-col items-center justify-center bg-neutral-900 text-paper/50">
-                    <VideoOff className="size-6" />
-                    <span className="mt-1 text-[10px]">Camera Off</span>
-                  </div>
-                ) : (
+              {/* Local Video Picture-in-Picture (PiP) */}
+              {!isCameraOff && (
+                <div
+                  className={cn(
+                    "absolute z-30 overflow-hidden rounded-xl border border-sand/40 bg-ink shadow-2xl transition-all duration-200",
+                    pipMinimized
+                      ? "bottom-24 right-4 h-20 w-16"
+                      : "bottom-24 right-4 h-44 w-32 sm:h-52 sm:w-36 md:bottom-28 md:right-6 md:h-56 md:w-40"
+                  )}
+                >
                   <video
                     ref={localVideoRef}
                     autoPlay
-                    muted
                     playsInline
-                    className="h-full w-full object-cover [transform:scaleX(-1)]"
+                    muted
+                    className="h-full w-full object-cover -scale-x-100"
                   />
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setPipMinimized(!pipMinimized)}
-                  className="absolute top-1.5 right-1.5 rounded-md bg-ink/70 p-1 text-paper/70 hover:text-paper"
-                  aria-label="Toggle preview size"
-                >
-                  <Maximize2 className="size-3" />
-                </button>
-                <div className="absolute bottom-1 left-2 rounded bg-ink/60 px-1 py-0.5 text-[9px] text-paper/80">
-                  You {isMuted && "· Muted"}
+                  <button
+                    onClick={() => setPipMinimized((m) => !m)}
+                    className="absolute top-1.5 right-1.5 rounded-full bg-ink/70 p-1 text-paper/90 hover:bg-ink"
+                    aria-label="Toggle preview size"
+                  >
+                    <Maximize2 className="size-3.5" />
+                  </button>
+                  <div className="absolute bottom-1 left-2 text-[10px] font-semibold text-paper/80 bg-ink/50 px-1.5 py-0.5 rounded">
+                    You
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <div className="relative mb-6">
+            /* Audio Mode */
+            <div className="flex flex-col items-center justify-center gap-6 p-6 text-center">
+              <div className="relative">
+                <div className="size-40 rounded-full border-4 border-sand/40 bg-sand/10 p-2 shadow-2xl sm:size-48">
+                  {peer?.avatar ? (
+                    <img
+                      src={peer.avatar}
+                      alt={peer.name}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center rounded-full bg-sand/30 text-5xl font-bold text-paper">
+                      {peer?.name?.charAt(0) || "F"}
+                    </div>
+                  )}
+                </div>
                 {isConnected && (
-                  <>
-                    <div className="absolute -inset-6 animate-pulse rounded-full bg-emerald-500/10 blur-xl" />
-                    <div className="absolute -inset-3 animate-ping rounded-full border border-emerald-400/30 duration-1000" />
-                  </>
-                )}
-                {peer?.avatar ? (
-                  <img
-                    src={peer.avatar}
-                    alt=""
-                    className="relative size-32 rounded-full border-4 border-paper/20 object-cover shadow-2xl"
-                  />
-                ) : (
-                  <div className="relative grid size-32 place-items-center rounded-full border-4 border-paper/20 bg-sand/20 font-serif text-5xl font-bold text-paper shadow-2xl">
-                    {peer?.name?.charAt(0) || "O"}
-                  </div>
+                  <div className="absolute -inset-2 rounded-full border-2 border-emerald-400/50 animate-pulse pointer-events-none" />
                 )}
               </div>
 
-              <h3 className="font-serif text-3xl font-bold text-paper">{peer?.name || "Friend"}</h3>
-              <p className="mt-2 text-base text-paper/70">
-                {isConnected ? (
-                  <span className="font-mono text-lg font-semibold text-emerald-400">
-                    {formatDuration(duration)}
+              <div>
+                <h3 className="font-serif text-3xl font-bold text-paper">{peer?.name}</h3>
+                <p className="mt-2 text-sm font-mono text-paper/80">
+                  {status === "calling"
+                    ? "Calling via Outstagram Voice…"
+                    : isConnected
+                    ? `Connected · ${formatDuration(duration)}`
+                    : "Connecting…"}
+                </p>
+                {isMuted && (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-3 py-1 text-xs font-semibold text-rose-300">
+                    <MicOff className="size-3" /> Microphone is muted
                   </span>
-                ) : (
-                  <span className="animate-pulse">Calling…</span>
                 )}
-              </p>
-
-              <audio ref={remoteVideoRef} autoPlay playsInline muted={speakerMuted} />
+              </div>
             </div>
           )}
         </div>
 
-        <footer className="relative z-20 flex items-center justify-center gap-3 bg-gradient-to-t from-ink via-ink/90 to-transparent px-4 py-5 md:gap-5 md:py-6">
+        {/* Bottom Call Controls Floating Toolbar */}
+        <footer className="relative z-20 flex items-center justify-center gap-3 border-t border-sand/20 bg-ink/95 px-4 py-4 md:gap-5 md:py-5">
+          {/* Mute Microphone Button */}
           <Button
-            type="button"
-            variant="outline"
             size="icon"
+            variant="ghost"
             onClick={toggleMic}
             className={cn(
-              "size-12 rounded-full border-2 transition-all shadow-lg",
+              "size-12 rounded-full border transition-transform hover:scale-105 active:scale-95 sm:size-14",
               isMuted
-                ? "border-rose-500 bg-rose-600/90 text-white hover:bg-rose-700"
-                : "border-paper/30 bg-paper/15 text-paper hover:bg-paper/25"
+                ? "border-rose-500/60 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30"
+                : "border-sand/40 bg-sand/20 text-paper hover:bg-sand/30"
             )}
             aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
           >
-            {isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+            {isMuted ? <MicOff className="size-5 sm:size-6" /> : <Mic className="size-5 sm:size-6" />}
           </Button>
 
+          {/* Toggle Camera Button (Video Call only) */}
           {isVideo && (
             <Button
-              type="button"
-              variant="outline"
               size="icon"
+              variant="ghost"
               onClick={toggleCamera}
               className={cn(
-                "size-12 rounded-full border-2 transition-all shadow-lg",
+                "size-12 rounded-full border transition-transform hover:scale-105 active:scale-95 sm:size-14",
                 isCameraOff
-                  ? "border-rose-500 bg-rose-600/90 text-white hover:bg-rose-700"
-                  : "border-paper/30 bg-paper/15 text-paper hover:bg-paper/25"
+                  ? "border-rose-500/60 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30"
+                  : "border-sand/40 bg-sand/20 text-paper hover:bg-sand/30"
               )}
               aria-label={isCameraOff ? "Turn on camera" : "Turn off camera"}
             >
-              {isCameraOff ? <VideoOff className="size-5" /> : <Video className="size-5" />}
+              {isCameraOff ? (
+                <VideoOff className="size-5 sm:size-6" />
+              ) : (
+                <Video className="size-5 sm:size-6" />
+              )}
             </Button>
           )}
 
+          {/* Switch Camera Button (Front/Rear, Video Call only) */}
           {isVideo && (
             <Button
-              type="button"
-              variant="outline"
               size="icon"
+              variant="ghost"
               onClick={switchCamera}
-              className="size-12 rounded-full border-2 border-paper/30 bg-paper/15 text-paper hover:bg-paper/25 shadow-lg"
-              aria-label="Switch camera"
+              className="size-12 rounded-full border border-sand/40 bg-sand/20 text-paper transition-transform hover:scale-105 hover:bg-sand/30 active:scale-95 sm:size-14"
+              aria-label="Flip camera"
             >
-              <SwitchCamera className="size-5" />
+              <SwitchCamera className="size-5 sm:size-6" />
             </Button>
           )}
 
+          {/* End Call Button (Big Red Button) */}
           <Button
-            type="button"
-            variant="destructive"
             size="icon"
             onClick={endCall}
-            className="size-14 rounded-full bg-rose-600 text-white shadow-xl hover:bg-rose-700 hover:scale-105 active:scale-95 transition-transform"
+            className="size-12 rounded-full bg-rose-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-rose-700 active:scale-95 sm:size-14"
             aria-label="End call"
           >
-            <PhoneOff className="size-6" />
+            <PhoneOff className="size-6 sm:size-7" />
           </Button>
         </footer>
       </div>

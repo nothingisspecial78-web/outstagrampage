@@ -1,27 +1,26 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface AudioMessagePlayerProps {
   audioUrl: string;
-  duration?: number | undefined;
-  mine: boolean;
+  duration?: number;
+  mine?: boolean;
 }
 
-export function AudioMessagePlayer({ audioUrl, duration = 0, mine }: AudioMessagePlayerProps) {
+export function AudioMessagePlayer({ audioUrl, duration = 0, mine = false }: AudioMessagePlayerProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(duration);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioDuration, setAudioDuration] = useState(duration);
 
   useEffect(() => {
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
+    const audio = audioRef.current;
+    if (!audio) return;
 
     const onLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-        setTotalDuration(Math.round(audio.duration));
+      if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+        setAudioDuration(Math.round(audio.duration));
       }
     };
 
@@ -39,85 +38,84 @@ export function AudioMessagePlayer({ audioUrl, duration = 0, mine }: AudioMessag
     audio.addEventListener("ended", onEnded);
 
     return () => {
-      try {
-        audio.pause();
-      } catch {}
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
-      audioRef.current = null;
+      audio.pause();
     };
   }, [audioUrl]);
 
   const togglePlay = () => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.warn("Audio playback failed:", err));
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const seekTime = parseFloat(e.target.value);
-    setCurrentTime(seekTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = seekTime;
+      audio.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
 
   const formatTime = (secs: number) => {
-    const s = Math.max(0, Math.floor(secs));
-    const mins = Math.floor(s / 60);
-    const rem = s % 60;
+    const mins = Math.floor(secs / 60);
+    const rem = Math.floor(secs % 60);
     return `${mins}:${rem.toString().padStart(2, "0")}`;
   };
 
-  const effectiveDuration = totalDuration || duration || 1;
+  const progress = audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0;
 
   return (
-    <div className="flex w-52 sm:w-60 items-center gap-2 py-0.5">
-      <Button
+    <div className="flex min-w-[210px] sm:min-w-[240px] items-center gap-3 py-1">
+      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+
+      {/* Play/Pause Button */}
+      <button
         type="button"
-        size="icon"
-        variant="ghost"
         onClick={togglePlay}
         className={cn(
-          "size-8 shrink-0 rounded-full",
+          "grid size-9 shrink-0 place-items-center rounded-full transition-transform hover:scale-105 active:scale-95 shadow-sm",
           mine
-            ? "bg-paper/20 text-paper hover:bg-paper/30"
-            : "bg-stamp/15 text-stamp-ink hover:bg-stamp/25"
+            ? "bg-paper text-stamp-ink hover:bg-paper/90"
+            : "bg-stamp text-primary-foreground hover:bg-stamp-ink"
         )}
-        aria-label={isPlaying ? "Pause audio" : "Play audio"}
+        aria-label={isPlaying ? "Pause voice message" : "Play voice message"}
       >
-        {isPlaying ? <Pause className="size-4 fill-current" /> : <Play className="size-4 fill-current ml-0.5" />}
-      </Button>
+        {isPlaying ? <Pause className="size-4 fill-current" /> : <Play className="ml-0.5 size-4 fill-current" />}
+      </button>
 
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="relative flex items-center">
-          <input
-            type="range"
-            min={0}
-            max={effectiveDuration}
-            step={0.1}
-            value={currentTime}
-            onChange={handleSeek}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-black/15 accent-stamp focus:outline-none"
-            aria-label="Seek audio"
-          />
+      {/* Waveform and Progress */}
+      <div className="flex flex-1 flex-col justify-center gap-1.5">
+        <div className="relative flex h-5 items-center gap-0.5 overflow-hidden">
+          {/* Static styled waveform bars */}
+          {[40, 70, 30, 90, 60, 100, 45, 80, 50, 75, 35, 85, 60, 95, 40, 70, 55, 90, 30, 65, 80, 45, 60, 35].map(
+            (heightPct, idx) => {
+              const barProgress = (idx / 24) * 100;
+              const isFilled = progress >= barProgress;
+              return (
+                <div
+                  key={idx}
+                  className={cn(
+                    "w-1 rounded-full transition-colors",
+                    mine
+                      ? isFilled
+                        ? "bg-paper"
+                        : "bg-paper/40"
+                      : isFilled
+                      ? "bg-stamp-ink"
+                      : "bg-sand"
+                  )}
+                  style={{ height: `${heightPct}%` }}
+                />
+              );
+            }
+          )}
         </div>
 
-        <div className="flex items-center justify-between gap-1 text-[10px] tabular-nums font-mono">
-          <span className={mine ? "text-paper/90" : "text-ink-muted"}>
-            {formatTime(currentTime)}
-          </span>
-          <span className={mine ? "text-paper/70" : "text-ink-muted"}>
-            {formatTime(effectiveDuration)}
-          </span>
+        {/* Timestamp */}
+        <div className="flex justify-between text-[10px] font-mono opacity-80">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(audioDuration || duration)}</span>
         </div>
       </div>
     </div>
