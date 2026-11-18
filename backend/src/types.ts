@@ -91,7 +91,8 @@ export interface CoachResponse {
   experiment?: {
     title: string;
     days: number;
-    description: string;
+    description?: string;
+    why?: string;
   };
-  remaining_today?: number;
+  remaining_today: number;
 }
