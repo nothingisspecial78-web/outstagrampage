@@ -12,16 +12,49 @@ export interface PostcardPayload {
   demo_mode?: boolean;
 }
 
+export interface CoachExperiment {
+  title: string;
+  days: number;
+  why?: string;
+  description?: string;
+}
+
 export interface CoachResponse {
   success: boolean;
   reply: string;
-  experiment?: {
-    title: string;
-    days: number;
-    why: string;
-  };
+  experiment?: CoachExperiment;
+  source?: 'ai' | 'fallback';
+  remaining_today: number;
   messagesLeftToday?: number;
 }
+
+// Exact rule-based fallback keywords (scroll, read, friend, lonely, bored, default)
+const FALLBACK_RULES: Record<string, { reply: string; experiment: CoachExperiment }> = {
+  scroll: {
+    reply: "Let's try a small experiment. Put your phone face down for the next hour. You don't need to share it.",
+    experiment: { title: "Put your phone face down for the next hour", days: 1, why: "Step away from the screen for 60 minutes." },
+  },
+  read: {
+    reply: "Let's try a small experiment. Read five pages every evening for seven days. You don't need to share it with anyone.",
+    experiment: { title: "Read five pages every evening", days: 7, why: "Five printed pages build a quiet evening rhythm." },
+  },
+  friend: {
+    reply: "Reach out to one person you haven't spoken to in a while. A short message is enough.",
+    experiment: { title: "Reach out to one person you haven't spoken to", days: 1, why: "A short, unhurried message rekindles real connection." },
+  },
+  lonely: {
+    reply: "Try spending ten minutes outside tomorrow, even just sitting. Small steps count.",
+    experiment: { title: "Spend ten minutes outside tomorrow", days: 1, why: "Sitting quietly outside anchors you in the physical world." },
+  },
+  bored: {
+    reply: "Pick one thing you've been meaning to make or do. Give it fifteen minutes today.",
+    experiment: { title: "Give fifteen minutes to a creative or offline thing", days: 1, why: "A quarter-hour is all it takes to get started." },
+  },
+  default: {
+    reply: "Try one small offline thing today. It doesn't have to be big.",
+    experiment: { title: "Try one small offline thing", days: 1, why: "Small offline moments anchor deep calm." },
+  },
+};
 
 /**
  * Submit a live postcard to the backend API and Supabase
@@ -107,56 +140,99 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
 }
 
 /**
- * Message the AI Life Coach
+ * Message the AI Life Coach (Up to 3 messages per day)
  */
 export async function askCoach(message: string): Promise<CoachResponse> {
+  let token: string | undefined;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    token = session?.access_token;
+  } catch {}
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   try {
     const res = await fetch(`${API_BASE}/coach/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ action: 'chat', message }),
     });
 
+    const data = await res.json();
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.message || 'Coach request failed');
+      throw new Error(data.message || data.error || 'Coach request failed');
     }
 
-    const data = await res.json();
+    const remaining = typeof data.remaining_today === 'number'
+      ? data.remaining_today
+      : typeof data.messagesLeftToday === 'number'
+      ? data.messagesLeftToday
+      : 2;
+
     return {
       success: true,
       reply: data.reply,
       experiment: data.experiment,
-      messagesLeftToday: data.messagesLeftToday,
+      source: data.source || 'ai',
+      remaining_today: remaining,
+      messagesLeftToday: remaining,
     };
-  } catch (err) {
-    console.warn('[Coach] Backend call failed, using client fallback:', err);
+  } catch (err: any) {
+    console.warn('[Coach] Backend call failed, using client rule-based fallback:', err);
+    const lower = (message || '').toLowerCase();
+    let fallback = FALLBACK_RULES.default;
+    for (const key of ['scroll', 'read', 'friend', 'lonely', 'bored']) {
+      if (lower.includes(key)) {
+        fallback = FALLBACK_RULES[key];
+        break;
+      }
+    }
+
     return {
       success: true,
-      reply: "That sounds familiar. Let's try one tiny thing, offline:",
-      experiment: {
-        title: "Leave your phone in another room during dinner",
-        days: 5,
-        why: "Meals get longer. Conversations too.",
-      },
+      reply: fallback.reply,
+      experiment: fallback.experiment,
+      source: 'fallback',
+      remaining_today: 2,
+      messagesLeftToday: 2,
     };
   }
 }
 
 /**
- * Get personalized weekly printable letter
+ * Get personalized weekly printable letter ("Make my weekly letter" summary action)
  */
 export async function getCoachSummary(): Promise<string> {
+  let token: string | undefined;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    token = session?.access_token;
+  } catch {}
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   try {
     const res = await fetch(`${API_BASE}/coach/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ action: 'summary' }),
     });
     const data = await res.json();
-    return data.summary;
+    if (data.summary) {
+      return data.summary;
+    }
+    throw new Error('No summary returned');
   } catch {
-    return "Dear friend,\nThis week you walked, noticed, and met someone. That's hours given back to your life.\nKeep going gently.";
+    return (
+      `Hereabouts Weekly Letter\n\n` +
+      `What you did: You logged offline quests and earned passport stamps.\n` +
+      `What you made: Real physical creations and postcards away from screens.\n` +
+      `Who you met: Face-to-face connections in physical places.\n\n` +
+      `One quiet suggestion for next week:\n` +
+      `Take a gentle 15-minute walk without your phone or read five pages of a book before sleep. Small steps count; no pressure at all.`
+    );
   }
 }
 
@@ -199,10 +275,13 @@ export async function logQuestToSupabase(questId: string, reflection: string, mi
     await supabase.from('stamps').insert({
       user_id: userId,
       kind: 'quest',
-      label: 'Walk 100 steps and notice three things',
+      label: questId,
     });
+
+    return { success: true };
   } catch (err) {
-    console.warn('[Quest] Supabase log fallback:', err);
+    console.warn('[Quest] Failed to log quest to Supabase:', err);
+    return { success: false };
   }
 }
 
