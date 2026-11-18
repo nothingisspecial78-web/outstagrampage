@@ -1,21 +1,53 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, MapPin, MessageCircle, UserPlus, Check } from "lucide-react";
 import { useState } from "react";
-import { Settings, Grid3x3, Stamp as StampIcon, Hourglass, Link2, Plus, Footprints, Gift, Users, Hammer, Lock } from "lucide-react";
+import {
+  ArrowLeft,
+  MapPin,
+  MessageCircle,
+  UserPlus,
+  Check,
+  Settings,
+  Grid3x3,
+  Stamp as StampIcon,
+  Hourglass,
+  Link2,
+  Plus,
+  Footprints,
+  Gift,
+  Users,
+  Hammer,
+  Lock,
+  Coins,
+  DollarSign,
+  Radio,
+  Sparkles,
+  Calendar,
+  Award,
+  Coffee,
+  BookOpen,
+  Info,
+  Wallet,
+  ShieldCheck,
+  Clock,
+  ArrowUpRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Postmark } from "@/components/hb/Postmark";
 import { Avatar } from "@/components/hb/AppShell";
-import { RACK, useStore, type Stamp } from "@/lib/store";
+import { RACK, useStore, type Stamp, PLACES_INFO } from "@/lib/store";
 import { ME, profileFor } from "@/lib/people";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/passport")({
   head: () => ({
     meta: [
-      { title: "Passport — Outstagram" },
-      { name: "description", content: "Your posts, moments and passport stamps from places, meetups, quests and crafts." },
-      { property: "og:title", content: "Passport — Outstagram" },
-      { property: "og:description", content: "Stamps you can only earn offline." },
+      { title: "Passport & Rewards — Outstagram" },
+      { name: "description", content: "Your real-world stamps, offline meetup rewards, in-app points withdrawable as cash, and community bulletin." },
+      { property: "og:title", content: "Passport & Rewards — Outstagram" },
+      { property: "og:description", content: "Stamps and rewards you can only earn offline." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -28,45 +60,139 @@ function MemberProfile({ handle }: { handle: string }) {
   const p = profileFor(handle);
   const { startChat, addFriendName, friends } = useStore();
   const nav = useNavigate();
-  if (!p) return <div className="py-20 text-center"><h1 className="font-serif text-2xl font-semibold text-ink">Member not found</h1><Link to="/passport" className="mt-3 inline-block text-link underline">Back to your passport</Link></div>;
+  if (!p)
+    return (
+      <div className="py-20 text-center">
+        <h1 className="font-serif text-2xl font-semibold text-ink">Member not found</h1>
+        <Link to="/passport" className="mt-3 inline-block text-link underline">Back to your passport</Link>
+      </div>
+    );
   const first = p.name.split(" ")[0]!;
   const isFriend = friends.includes(first);
   return (
     <div className="mx-auto max-w-[760px]">
-      <Link to="/passport" className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink"><ArrowLeft className="size-4" />Your passport</Link>
+      <Link to="/passport" className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
+        <ArrowLeft className="size-4" />Your passport
+      </Link>
       <header className="flex gap-5 rounded-2xl border border-sand bg-paper-raised p-5 shadow-paper sm:gap-10 sm:p-8">
         <Avatar src={p.avatar} size="size-20 sm:size-32" ring="story" className="shrink-0 self-start" />
         <div className="min-w-0 flex-1 space-y-3">
           <div><h1 className="text-xl text-ink">{p.handle}</h1><p className="font-semibold text-ink">{p.name}</p></div>
           <p className="text-sm text-ink">{p.bio}</p>
-          <p className="flex items-center gap-1 text-sm text-ink-muted"><MapPin className="size-4" />{p.location} · Friend code <b className="tabular-nums text-ink">{p.code}</b></p>
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-moss/10 px-3 py-1 text-sm text-moss"><Hourglass className="size-4" /><b>{p.hours}h</b> reclaimed</p>
+          <p className="flex items-center gap-1 text-sm text-ink-muted">
+            <MapPin className="size-4" />{p.location} · Friend code <b className="tabular-nums text-ink">{p.code}</b>
+          </p>
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-moss/10 px-3 py-1 text-sm text-moss">
+            <Hourglass className="size-4" /><b>{p.hours}h</b> reclaimed
+          </p>
           <div className="flex flex-wrap gap-2 pt-1">
-            <button onClick={() => { const id = startChat(p.name); nav({ to: "/chats/$id", params: { id } }); }} className="inline-flex items-center gap-1.5 rounded-lg bg-stamp px-4 py-2 text-sm font-semibold text-primary-foreground"><MessageCircle className="size-4" />Message</button>
-            <button disabled={isFriend} onClick={() => { addFriendName(first); toast.success(`${first} added as a friend`); }} className="inline-flex items-center gap-1.5 rounded-lg bg-line px-4 py-2 text-sm font-semibold text-ink hover:bg-sand disabled:opacity-70">{isFriend ? <><Check className="size-4" />Friends</> : <><UserPlus className="size-4" />Add Friend</>}</button>
+            <button
+              onClick={() => { const id = startChat(p.name); nav({ to: "/chats/$id", params: { id } }); }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-stamp px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              <MessageCircle className="size-4" />Message
+            </button>
+            <button
+              disabled={isFriend}
+              onClick={() => { addFriendName(first); toast.success(`${first} added as a friend`); }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-line px-4 py-2 text-sm font-semibold text-ink hover:bg-sand disabled:opacity-70"
+            >
+              {isFriend ? <><Check className="size-4" />Friends</> : <><UserPlus className="size-4" />Add Friend</>}
+            </button>
           </div>
         </div>
       </header>
       <h2 className="mt-8 mb-4 font-serif text-xl font-semibold text-ink">{first}'s stamps</h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {p.stamps.map((s, i) => <div key={i} className="grid place-items-center rounded-2xl border border-sand bg-paper-raised p-4"><Postmark place={s.label} date={s.date} tone={tone(s.kind)} className={i % 2 ? "rotate-6" : ""} /><p className="mt-2 text-xs capitalize text-ink-muted">{s.kind}</p></div>)}
+        {p.stamps.map((s, i) => (
+          <div key={i} className="grid place-items-center rounded-2xl border border-sand bg-paper-raised p-4">
+            <Postmark place={s.label} date={s.date} tone={tone(s.kind)} className={i % 2 ? "rotate-6" : ""} />
+            <p className="mt-2 text-xs capitalize text-ink-muted">{s.kind}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 const tone = (k: Stamp["kind"]) => (k === "quest" ? "moss" : k === "craft" ? "ink" : "stamp") as "moss" | "ink" | "stamp";
+
 const TABS = [
-  { id: "stamps", label: "Stamps", icon: StampIcon },
+  { id: "rewards", label: "Rewards & Stamps", icon: Gift },
+  { id: "bulletin", label: "Local Bulletin", icon: Info },
+  { id: "stamps", label: "Passport Stamps", icon: StampIcon },
   { id: "activities", label: "Activities", icon: Footprints },
-  { id: "rewards", label: "Rewards", icon: Gift },
   { id: "posts", label: "My Postcards", icon: Grid3x3 },
 ] as const;
-const VOUCHERS = [
-  { place: "Riverside Cafe", text: "Free chai", need: "Riverside Cafe stamp" },
-  { place: "Remparts Books", text: "10% off an atlas", need: "Remparts Books stamp" },
-  { place: "Corner Bakery", text: "Day-old loaf after 5pm", need: "Corner Bakery stamp" },
+
+// Community Noticeboard / Bulletin: Ads as calm information
+const COMMUNITY_NOTICES = [
+  {
+    id: "b1",
+    tag: "Workshop",
+    title: "Botanical Watercolor & Seed Exchange",
+    place: "Old Greenhouse",
+    time: "Saturday · 10:00 AM – 1:00 PM",
+    desc: "Free community gathering. Bring your watercolor pads, brushes, and spare heirloom seeds to trade. Hosted by neighborhood gardeners.",
+    tone: "moss",
+  },
+  {
+    id: "b2",
+    tag: "Book Swap",
+    title: "Used Poetry & Atlas Night",
+    place: "Remparts Books",
+    time: "Tuesday · 6:30 PM – 8:00 PM",
+    desc: "Bring one beloved read, take one home. Free herbal mint tea served. No buying required, purely sharing stories.",
+    tone: "stamp",
+  },
+  {
+    id: "b3",
+    tag: "Music & Gathering",
+    title: "Quiet Acoustic Folk on the Pier",
+    place: "West Pier",
+    time: "Friday · Golden Hour (5:30 PM)",
+    desc: "Unamplified string instruments as the sun dips into the harbor. Bring a warm blanket and a thermos of cocoa.",
+    tone: "ink",
+  },
+  {
+    id: "b4",
+    tag: "Local Craft",
+    title: "Sourdough Starter Workshop",
+    place: "Corner Bakery",
+    time: "Sunday · 9:00 AM",
+    desc: "Learn wild yeast fermentation from Master Baker Elena. Free 12-year sourdough starter jar to all participants.",
+    tone: "moss",
+  },
 ];
+
+// Offline Place Challenges
+const PLACE_CHALLENGES = [
+  {
+    id: "ch1",
+    name: "The Riverside Walk",
+    places: ["Riverside Cafe", "West Pier"],
+    reward: "Free Artisan Chai & Cinnamon Knot",
+    points: 300,
+    desc: "Visit both waterside spots to unlock a handmade treat at Riverside Cafe.",
+  },
+  {
+    id: "ch2",
+    name: "Quiet Pages & Greenery",
+    places: ["Remparts Books", "Old Greenhouse"],
+    reward: "15% Off Any Vintage Book + Botanical Plant Cutting",
+    points: 250,
+    desc: "Spend an afternoon reading and exploring the greenhouses.",
+  },
+  {
+    id: "ch3",
+    name: "Dawn Baker’s Trail",
+    places: ["Corner Bakery", "Linden Park"],
+    reward: "Fresh Sourdough Baguette + Park Companion Badge",
+    points: 200,
+    desc: "Pick up fresh bread and take a quiet morning stroll through the trees.",
+  },
+];
+
 const HIGHLIGHTS = [["Pier", 3], ["Books", 2], ["Bakes", 0], ["Walks", 1]] as const;
 
 function Profile() {
@@ -76,59 +202,563 @@ function Profile() {
 }
 
 function MyProfile() {
-  const { stamps, hours, session } = useStore();
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("stamps");
+  const { stamps, hours, session, addStamp } = useStore();
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("rewards");
+  const [rewardFilter, setRewardFilter] = useState<"all" | "ready" | "challenges" | "meetups">("all");
+  const [withdrawModal, setWithdrawModal] = useState(false);
+  const [redeemModal, setRedeemModal] = useState<string | null>(null);
+  const [points, setPoints] = useState(1850);
+  const [payoutAmount, setPayoutAmount] = useState("18.50");
+  const [payoutMethod, setPayoutMethod] = useState<"bank" | "paypal" | "local">("bank");
+  const [payoutBusy, setPayoutBusy] = useState(false);
+
   const handle = ME.handle;
   const count = (k: Stamp["kind"]) => stamps.filter((s) => s.kind === k).length;
-  const stats = [[String(17 + count("quest")), "quests"], [String(8 + count("meetup")), "meetups"], [String(12 + count("place")), "postcards"], [String(5 + count("craft")), "crafts"]] as const;
+  const stats = [
+    [String(17 + count("quest")), "quests"],
+    [String(8 + count("meetup")), "meetups"],
+    [String(12 + count("place")), "postcards"],
+    [String(5 + count("craft")), "crafts"],
+  ] as const;
+
+  const handleWithdraw = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(payoutAmount);
+    if (isNaN(val) || val <= 0 || val > points / 100) {
+      toast.error("Please enter a valid amount within your available balance.");
+      return;
+    }
+    setPayoutBusy(true);
+    setTimeout(() => {
+      setPoints((p) => Math.max(0, p - Math.round(val * 100)));
+      setPayoutBusy(false);
+      setWithdrawModal(false);
+      toast.success(
+        `Withdrawal of $${val.toFixed(2)} requested! Payout will arrive in your ${
+          payoutMethod === "bank" ? "bank account" : payoutMethod === "paypal" ? "PayPal" : "local merchant voucher"
+        } in 1-2 business days.`
+      );
+    }, 1200);
+  };
+
+  const simulateCheckin = (placeName: string) => {
+    addStamp("place", placeName);
+    setPoints((p) => p + 150);
+    toast.success(`Stamp verified at ${placeName}! Earned +150 points.`);
+  };
+
+  const hasStamp = (label: string) => stamps.some((s) => s.label.toLowerCase().includes(label.toLowerCase()));
 
   return (
-    <div className="mx-auto max-w-[935px]">
-      <header className="flex gap-5 px-1 sm:gap-16 sm:px-8">
+    <div className="mx-auto max-w-[960px] pb-10">
+      {/* Profile Header */}
+      <header className="flex gap-5 px-1 sm:gap-16 sm:px-6">
         <Avatar src={ME.avatar} size="size-20 sm:size-36" ring="story" className="shrink-0 self-start" />
         <div className="min-w-0 flex-1 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="mr-2 text-xl text-ink">{handle}</h1>
+            <h1 className="mr-2 text-xl text-ink font-semibold">{handle}</h1>
             <button onClick={() => toast("Profile editor is in Settings")} className="rounded-lg bg-line px-4 py-1.5 text-sm font-semibold text-ink hover:bg-sand">Edit profile</button>
-            <button onClick={() => toast("Archive is private to you")} className="hidden rounded-lg bg-line px-4 py-1.5 text-sm font-semibold text-ink hover:bg-sand sm:block">View archive</button>
-            <Link to="/settings" aria-label="Settings" className="p-1 text-ink"><Settings className="size-6" /></Link>
+            <Link to="/settings" aria-label="Settings" className="p-1 text-ink hover:text-stamp"><Settings className="size-6" /></Link>
           </div>
           <ul className="flex gap-4 text-sm sm:gap-8 sm:text-base">
-            {stats.map(([n, l]) => <li key={l} className="text-center sm:text-left"><b className="block text-ink sm:inline">{n}</b> <span className="text-ink-muted">{l}</span></li>)}
+            {stats.map(([n, l]) => (
+              <li key={l} className="text-center sm:text-left">
+                <b className="block text-ink sm:inline font-bold">{n}</b> <span className="text-ink-muted">{l}</span>
+              </li>
+            ))}
           </ul>
-          <div className="hidden sm:block"><Bio name={session?.name ?? ME.name} hours={hours} /></div>
+          <div className="hidden sm:block"><Bio name={session?.name ?? ME.name} hours={hours} points={points} /></div>
         </div>
       </header>
-      <div className="mt-4 px-1 sm:hidden"><Bio name={session?.name ?? ME.name} hours={hours} /></div>
+      <div className="mt-4 px-1 sm:hidden"><Bio name={session?.name ?? ME.name} hours={hours} points={points} /></div>
 
-      <div className="no-scrollbar mt-8 flex gap-6 overflow-x-auto px-1 sm:px-8">
+      {/* Highlights */}
+      <div className="no-scrollbar mt-8 flex gap-6 overflow-x-auto px-1 sm:px-6">
         {HIGHLIGHTS.map(([l, i]) => (
-          <button key={l} onClick={() => toast(`${l} highlight`)} className="flex shrink-0 flex-col items-center gap-1.5">
+          <button key={l} onClick={() => toast(`${l} highlight moments`)} className="flex shrink-0 flex-col items-center gap-1.5">
             <span className="rounded-full border border-sand p-1"><img src={RACK[i]?.img} alt="" className="size-16 rounded-full object-cover sm:size-20" /></span>
             <span className="text-xs font-semibold text-ink">{l}</span>
           </button>
         ))}
-        <button className="flex shrink-0 flex-col items-center gap-1.5"><span className="grid size-[74px] place-items-center rounded-full border border-sand sm:size-[90px]"><Plus className="size-8 text-ink-muted" /></span><span className="text-xs font-semibold text-ink">New</span></button>
+        <button onClick={() => toast("Create a new memory highlight in Capture")} className="flex shrink-0 flex-col items-center gap-1.5">
+          <span className="grid size-[74px] place-items-center rounded-full border border-sand sm:size-[90px]"><Plus className="size-8 text-ink-muted" /></span>
+          <span className="text-xs font-semibold text-ink">New</span>
+        </button>
       </div>
 
-      <nav className="mt-8 flex justify-center gap-10 border-t border-sand sm:gap-14">
+      {/* Tabs navigation */}
+      <nav className="mt-8 flex justify-center gap-4 sm:gap-10 border-t border-sand overflow-x-auto px-2">
         {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={cn("-mt-px flex items-center gap-1.5 border-t py-4 text-xs font-semibold tracking-widest uppercase", tab === t.id ? "border-ink text-ink" : "border-transparent text-ink-muted")}>
-            <t.icon className="size-4" /><span className="hidden sm:inline">{t.label}</span>
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "-mt-px flex items-center gap-1.5 border-t py-4 text-xs font-semibold tracking-wider uppercase whitespace-nowrap transition-colors",
+              tab === t.id ? "border-stamp text-stamp font-bold" : "border-transparent text-ink-muted hover:text-ink"
+            )}
+          >
+            <t.icon className="size-4" />
+            <span>{t.label}</span>
           </button>
         ))}
       </nav>
 
-      {tab === "posts" && (
-        <div className="grid grid-cols-2 gap-4 py-6 sm:grid-cols-3">
-          {RACK.slice(0, 6).map((c, i) => (
-            <figure key={i} className={cn("rounded-sm border border-sand bg-paper-raised p-2 shadow-paper", i % 2 ? "rotate-1" : "-rotate-1")}>
-              <img src={c.img} alt={c.place} loading="lazy" className="aspect-[3/2] w-full object-cover" />
-              <figcaption className="mt-1.5 font-hand text-lg leading-5 text-ink">{c.place}</figcaption>
-            </figure>
-          ))}
+      {/* TAB 1: REWARDS & STAMPS (Enhanced as per User Request) */}
+      {tab === "rewards" && (
+        <div className="space-y-8 py-6">
+          {/* A) In-App Points with Cashout Banner */}
+          <section className="relative overflow-hidden rounded-3xl border border-sand bg-gradient-to-br from-paper-raised via-paper to-sand/20 p-6 shadow-paper">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink uppercase tracking-wider">
+                  <Coins className="size-3.5" /> Real-World Presence Rewards
+                </div>
+                <h2 className="font-serif text-3xl font-extrabold text-ink sm:text-4xl">
+                  {points.toLocaleString()} <span className="text-xl font-normal text-ink-muted">pts</span>
+                  <span className="ml-3 font-sans text-2xl font-bold text-moss">~ ${(points / 100).toFixed(2)} USD</span>
+                </h2>
+                <p className="max-w-xl text-xs sm:text-sm text-ink-muted leading-relaxed">
+                  You earn in-app points by stepping outside, visiting local independent places, and meeting friends in real life.
+                  No ads, no data sales. Points can be withdrawn as real cash or converted into local cafe perks.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-1 text-xs font-medium text-ink-muted">
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 100 pts / hr offline</span>
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 250 pts / 1-on-1 meetup</span>
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 500 pts / group meetup</span>
+                  <span className="flex items-center gap-1"><Check className="size-3.5 text-moss" /> 150 pts / place stamp</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
+                <Button
+                  onClick={() => setWithdrawModal(true)}
+                  className="bg-ink hover:bg-ink/90 text-paper-raised font-bold shadow-postcard px-6 py-5 text-sm rounded-2xl flex items-center justify-center gap-2"
+                >
+                  <Wallet className="size-4 text-stamp-glow" /> Withdraw as Cash
+                </Button>
+                <button
+                  onClick={() => toast.info("100 pts = $1.00 USD. Direct ACH, PayPal, or Local Shop Credit.")}
+                  className="text-xs text-center text-ink-muted hover:text-ink underline"
+                >
+                  How cashouts work
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Reward Filters */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sand pb-3">
+            <div>
+              <h3 className="font-serif text-xl font-bold text-ink">Stamps Inside Rewards</h3>
+              <p className="text-xs text-ink-muted">Achieved stamps unlock perks; upcoming stamps guide your next walk.</p>
+            </div>
+            <div className="flex items-center gap-1 rounded-xl bg-line/60 p-1">
+              {[
+                { id: "all", label: "All Rewards" },
+                { id: "ready", label: "Achieved & Ready" },
+                { id: "challenges", label: "Place Challenges" },
+                { id: "meetups", label: "Offline Meets" },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setRewardFilter(f.id as typeof rewardFilter)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                    rewardFilter === f.id ? "bg-paper-raised text-ink shadow-sm font-bold" : "text-ink-muted hover:text-ink"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* B) Offline Meet Reward Tiers (Personal vs Group Meetup) */}
+          {(rewardFilter === "all" || rewardFilter === "meetups") && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="size-5 text-stamp" />
+                  <h4 className="font-serif text-lg font-bold text-ink">Offline Meet Reward Tiers</h4>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-2.5 py-0.5 text-xs font-bold text-moss">
+                  <Radio className="size-3 animate-pulse" /> BLE Proximity Discovery Active
+                </span>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Personal Meetup Tier */}
+                <div className="relative rounded-2xl border border-sand bg-paper-raised p-5 shadow-paper flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="inline-block rounded-md bg-stamp-soft px-2 py-0.5 text-[11px] font-bold text-stamp-ink uppercase">
+                        Tier 1 · 1-on-1 Personal Meet
+                      </span>
+                      <Postmark place="Meetup: 1-on-1" date="ACTIVE" tone="stamp" className="size-14 -mr-1 -mt-1" />
+                    </div>
+                    <h5 className="mt-2 font-serif text-xl font-bold text-ink">Coffee Companion Stamp</h5>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Meet any friend in person for at least 15 minutes. Automatically sensed via offline peer-to-peer connection.
+                    </p>
+                    <ul className="mt-3 space-y-1.5 text-xs text-ink">
+                      <li className="flex items-center gap-2 font-medium">
+                        <Check className="size-3.5 text-moss" /> +20 extra DM messages unlocked
+                      </li>
+                      <li className="flex items-center gap-2 font-medium">
+                        <Check className="size-3.5 text-moss" /> +250 in-app points ($2.50 cash value)
+                      </li>
+                      <li className="flex items-center gap-2 font-medium">
+                        <Check className="size-3.5 text-moss" /> Personal meetup passport postmark
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="mt-5 pt-3 border-t border-sand flex items-center justify-between">
+                    <span className="text-xs text-ink-muted">3 meetups this month</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        addStamp("meetup", "with Friend");
+                        setPoints((p) => p + 250);
+                        toast.success("1-on-1 meetup logged! +250 points and 20 messages unlocked.");
+                      }}
+                      className="border-sand bg-paper hover:bg-line text-xs"
+                    >
+                      Log Personal Meet
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Group Meetup Tier */}
+                <div className="relative rounded-2xl border border-sand bg-paper-raised p-5 shadow-paper flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="inline-block rounded-md bg-moss/20 px-2 py-0.5 text-[11px] font-bold text-moss uppercase">
+                        Tier 2 · Group Meetup (3+ People)
+                      </span>
+                      <Postmark place="Community Meet" date="TIER 2" tone="moss" className="size-14 -mr-1 -mt-1" />
+                    </div>
+                    <h5 className="mt-2 font-serif text-xl font-bold text-ink">Community Circle Stamp</h5>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Gather with 3 or more Outstagram members at a local park, craft workshop, or cafe.
+                    </p>
+                    <ul className="mt-3 space-y-1.5 text-xs text-ink">
+                      <li className="flex items-center gap-2 font-medium">
+                        <Check className="size-3.5 text-moss" /> +500 in-app points ($5.00 cash value)
+                      </li>
+                      <li className="flex items-center gap-2 font-medium">
+                        <Check className="size-3.5 text-moss" /> 20% Group Table Voucher at Corner Bakery
+                      </li>
+                      <li className="flex items-center gap-2 font-medium">
+                        <Check className="size-3.5 text-moss" /> Exclusive Community Circle gold stamp
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="mt-5 pt-3 border-t border-sand flex items-center justify-between">
+                    <span className="text-xs text-ink-muted">Next meetup: Saturday 11am</span>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        addStamp("meetup", "Group Meetup");
+                        setPoints((p) => p + 500);
+                        toast.success("Group meetup stamped! +500 points and 20% group voucher unlocked.");
+                      }}
+                      className="bg-moss hover:bg-moss/90 text-paper-raised text-xs"
+                    >
+                      Log Group Meet
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* C) "Visit a Place" Challenges with Stamp Verification */}
+          {(rewardFilter === "all" || rewardFilter === "challenges") && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Award className="size-5 text-stamp" />
+                  <h4 className="font-serif text-lg font-bold text-ink">"Visit a Place" Neighborhood Challenges</h4>
+                </div>
+                <span className="text-xs text-ink-muted">Complete visits to unlock real treats</span>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                {PLACE_CHALLENGES.map((ch) => {
+                  const completedCount = ch.places.filter((p) => hasStamp(p)).length;
+                  const isDone = completedCount === ch.places.length;
+                  return (
+                    <div
+                      key={ch.id}
+                      className={cn(
+                        "rounded-2xl border p-5 shadow-paper flex flex-col justify-between transition-all",
+                        isDone ? "border-moss/40 bg-moss/5" : "border-sand bg-paper-raised"
+                      )}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-stamp-ink uppercase tracking-wider">
+                            +{ch.points} Points
+                          </span>
+                          {isDone ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-moss px-2 py-0.5 text-[10px] font-bold text-paper-raised">
+                              <Check className="size-3" /> Unlocked
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-ink-muted">
+                              {completedCount}/{ch.places.length} Stamps
+                            </span>
+                          )}
+                        </div>
+
+                        <h5 className="mt-2 font-serif text-lg font-bold text-ink">{ch.name}</h5>
+                        <p className="mt-1 text-xs text-ink-muted">{ch.desc}</p>
+
+                        <div className="mt-4 space-y-2">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Required Stamps:</p>
+                          {ch.places.map((place) => {
+                            const stamped = hasStamp(place);
+                            return (
+                              <div
+                                key={place}
+                                className="flex items-center justify-between rounded-lg bg-paper px-2.5 py-1.5 border border-sand/70 text-xs"
+                              >
+                                <span className="font-medium text-ink">{place}</span>
+                                {stamped ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-moss">
+                                    <Check className="size-3" /> Stamped
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => simulateCheckin(place)}
+                                    className="text-[10px] text-stamp-ink font-semibold hover:underline"
+                                  >
+                                    Verify visit
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-4 rounded-xl border border-dashed border-sand bg-paper p-2.5">
+                          <p className="text-[11px] font-bold text-ink-muted uppercase">Unlocked Perk:</p>
+                          <p className="font-hand text-lg text-ink">{ch.reward}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-sand">
+                        {isDone ? (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setRedeemModal(ch.reward);
+                              toast.success("Ready to redeem at the counter!");
+                            }}
+                            className="w-full bg-moss hover:bg-moss/90 text-paper-raised text-xs font-bold"
+                          >
+                            Redeem Perk Voucher
+                          </Button>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 text-xs text-ink-muted py-1">
+                            <Lock className="size-3.5" /> Visit all {ch.places.length} spots
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* D) Stamps Achieved Displayed Cleanly Alongside Rewards */}
+          {(rewardFilter === "all" || rewardFilter === "ready") && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <StampIcon className="size-5 text-stamp" />
+                  <h4 className="font-serif text-lg font-bold text-ink">Individual Place Vouchers & Stamps</h4>
+                </div>
+                <span className="text-xs text-ink-muted">Present your stamped passport at the shop counter</span>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { place: "Riverside Cafe", perk: "Free artisan cup of chai or drip coffee", need: "Riverside Cafe stamp", pointsValue: 150 },
+                  { place: "Remparts Books", perk: "10% off any vintage hardcover or atlas", need: "Remparts Books stamp", pointsValue: 200 },
+                  { place: "Corner Bakery", perk: "Complimentary day-old artisan sourdough loaf", need: "Corner Bakery stamp", pointsValue: 150 },
+                  { place: "West Pier", perk: "Seaside panoramic postcard print by local artist", need: "West Pier stamp", pointsValue: 150 },
+                ].map((v) => {
+                  const achieved = hasStamp(v.place);
+                  return (
+                    <div
+                      key={v.place}
+                      className={cn(
+                        "flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition-all",
+                        achieved ? "border-moss/50 bg-paper-raised shadow-paper" : "border-sand bg-paper/60 opacity-80"
+                      )}
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <Postmark
+                          place={v.place}
+                          date={achieved ? "ACHIEVED" : "LOCKED"}
+                          tone={achieved ? "moss" : "ink"}
+                          className={cn("size-16 shrink-0", !achieved && "opacity-45")}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h5 className="font-hand text-2xl text-ink leading-tight">{v.perk}</h5>
+                            {achieved && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-moss/10 px-2 py-0.5 text-[11px] font-bold text-moss">
+                                <Check className="size-3" /> Ready
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-ink-muted">
+                            {v.place} · {achieved ? "Stamp in passport · verified" : `Needs a ${v.need}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 sm:self-center">
+                        {achieved ? (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setRedeemModal(`${v.place}: ${v.perk}`);
+                            }}
+                            className="bg-moss hover:bg-moss/90 text-paper-raised text-xs font-bold px-4"
+                          >
+                            Redeem
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => simulateCheckin(v.place)}
+                            className="border-sand bg-paper hover:bg-line text-xs"
+                          >
+                            <Lock className="size-3.5 mr-1" /> Check in here
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       )}
+
+      {/* TAB 2: COMMUNITY NOTICEBOARD (Ads as Calm Information - User Request Point 12) */}
+      {tab === "bulletin" && (
+        <div className="space-y-6 py-6">
+          <div className="rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper">
+            <div className="flex items-start gap-4">
+              <span className="grid size-12 place-items-center rounded-2xl bg-stamp-soft text-stamp-ink shrink-0">
+                <Info className="size-6" />
+              </span>
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-stamp-ink">Anti-Ad Philosophy</span>
+                <h3 className="font-serif text-2xl font-bold text-ink">Ads as Calm Information, Not Tracking</h3>
+                <p className="mt-1 text-sm text-ink-muted leading-relaxed">
+                  Outstagram has no programmatic ads, no retargeting pixels, and no behavioral profiling.
+                  Instead, we have this <b>Community Noticeboard</b>: calm, local announcements from neighborhood shops,
+                  craft workshops, and book swaps. Informative, static, and privacy-respecting.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {COMMUNITY_NOTICES.map((n) => (
+              <article
+                key={n.id}
+                className="paper-card relative flex flex-col justify-between p-6 transition-transform hover:-translate-y-0.5"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-md bg-stamp-soft/80 px-2 py-0.5 text-[11px] font-bold text-stamp-ink uppercase">
+                      {n.tag}
+                    </span>
+                    <Postmark place={n.place} date="NOTICE" tone={n.tone as any} className="size-14 -mr-2 -mt-2" />
+                  </div>
+
+                  <h4 className="mt-3 font-serif text-xl font-bold text-ink">{n.title}</h4>
+                  <p className="mt-1.5 text-xs text-ink font-medium flex items-center gap-1.5 text-stamp-ink">
+                    <MapPin className="size-3.5" /> {n.place}
+                  </p>
+                  <p className="text-xs text-ink-muted flex items-center gap-1.5 mt-0.5">
+                    <Clock className="size-3.5" /> {n.time}
+                  </p>
+
+                  <p className="mt-3 text-xs text-ink-muted leading-relaxed">
+                    {n.desc}
+                  </p>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-sand flex items-center justify-between text-xs">
+                  <span className="text-ink-muted">Free & open to neighbors</span>
+                  <button
+                    onClick={() => toast.success(`Saved "${n.title}" to your offline calendar.`)}
+                    className="font-bold text-stamp-ink hover:underline inline-flex items-center gap-1"
+                  >
+                    Save notice <ArrowUpRight className="size-3.5" />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-dashed border-sand bg-paper p-5 text-center">
+            <p className="font-serif text-lg font-bold text-ink">Are you an independent local maker or shop?</p>
+            <p className="text-xs text-ink-muted mt-1 max-w-md mx-auto">
+              Post an informative notice on the board without paying an ad broker. Free for local community groups and verified artisans.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => toast.info("Partner submissions can be registered with the local community admin.")}
+              className="mt-3 border-sand"
+            >
+              Submit a Community Notice
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: PASSPORT STAMPS */}
+      {tab === "stamps" && (
+        <div className="py-6">
+          <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-ink p-6 text-paper-raised shadow-postcard">
+            <div className="flex items-center gap-4">
+              <Hourglass className="size-10 text-stamp-glow shrink-0" />
+              <div>
+                <p className="font-serif text-4xl sm:text-5xl font-semibold leading-none">{hours}h</p>
+                <p className="text-sm opacity-80 mt-1">reclaimed from scrolling · {stamps.length} stamps in your passport</p>
+              </div>
+            </div>
+            <div className="text-right sm:border-l sm:border-line/20 sm:pl-6">
+              <p className="font-serif text-2xl font-bold text-moss">{points} Points</p>
+              <p className="text-xs text-paper-raised/75">Earned offline</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {stamps.map((s, i) => (
+              <div key={s.id} className="paper-card animate-rise flex flex-col items-center p-4" style={{ animationDelay: `${i * 40}ms` }}>
+                <Postmark place={s.label} date={s.date} tone={tone(s.kind)} className={i % 2 ? "rotate-6" : ""} />
+                <span className="mt-2 text-[11px] font-bold tracking-widest text-ink-muted uppercase">{s.kind} stamp</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: ACTIVITIES */}
       {tab === "activities" && (
         <div className="grid gap-3 py-6 sm:grid-cols-2">
           {([[Footprints, "Quests completed", stats[0][0], "moss"], [Users, "Meetups in person", stats[1][0], "stamp"], [StampIcon, "Postcards stamped", stats[2][0], "stamp"], [Hammer, "Crafts logged", stats[3][0], "ink"]] as const).map(([I, l, n, t]) => (
@@ -140,46 +770,153 @@ function MyProfile() {
           <p className="text-center text-xs text-ink-muted sm:col-span-2">Just for you. No streaks, no rankings, nobody else sees this.</p>
         </div>
       )}
-      {tab === "rewards" && (
-        <div className="space-y-3 py-6">
-          {VOUCHERS.map((v) => {
-            const has = stamps.some((s) => s.label === v.place);
-            return (
-              <div key={v.place} className="flex items-center gap-4 rounded-2xl border-2 border-dashed border-sand bg-paper-raised p-4">
-                <Postmark place={v.place} date={has ? "READY" : "LOCKED"} tone={has ? "moss" : "ink"} className={cn("size-16", !has && "opacity-40")} />
-                <div className="flex-1"><p className="font-hand text-2xl text-ink">{v.text}</p><p className="text-xs text-ink-muted">{v.place} · needs a {v.need}</p></div>
-                {has ? <button onClick={() => toast.success("Show this at the counter")} className="rounded-xl bg-moss px-4 py-2 text-sm font-bold text-paper-raised">Redeem</button> : <span className="flex items-center gap-1 text-xs text-ink-muted"><Lock className="size-3.5" /> Visit to unlock</span>}
-              </div>
-            );
-          })}
+
+      {/* TAB 5: MY POSTCARDS */}
+      {tab === "posts" && (
+        <div className="grid grid-cols-2 gap-4 py-6 sm:grid-cols-3">
+          {RACK.slice(0, 6).map((c, i) => (
+            <figure key={i} className={cn("rounded-sm border border-sand bg-paper-raised p-2 shadow-paper", i % 2 ? "rotate-1" : "-rotate-1")}>
+              <img src={c.img} alt={c.place} loading="lazy" className="aspect-[3/2] w-full object-cover rounded-sm" />
+              <figcaption className="mt-1.5 font-hand text-lg leading-5 text-ink">{c.place}</figcaption>
+            </figure>
+          ))}
         </div>
       )}
-      {tab === "stamps" && (
-        <div className="py-6">
-          <div className="mb-6 flex items-center justify-center gap-4 rounded-2xl bg-ink p-6 text-paper-raised"><Hourglass className="size-10 text-stamp-glow" /><div><p className="font-serif text-5xl font-semibold leading-none">{hours}h</p><p className="text-sm opacity-75">reclaimed · {stamps.length} stamps in your passport</p></div></div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {stamps.map((s, i) => (
-              <div key={s.id} className="paper-card animate-rise flex flex-col items-center p-4" style={{ animationDelay: `${i * 40}ms` }}>
-                <Postmark place={s.label} date={s.date} tone={tone(s.kind)} className={i % 2 ? "rotate-6" : ""} />
-                <span className="mt-2 text-[11px] font-bold tracking-widest text-ink-muted uppercase">{s.kind} stamp</span>
+
+      {/* WITHDRAW CASH MODAL */}
+      <Dialog open={withdrawModal} onOpenChange={setWithdrawModal}>
+        <DialogContent className="border-sand bg-paper-raised sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl font-bold flex items-center gap-2">
+              <Wallet className="size-6 text-stamp" /> Withdraw In-App Points as Cash
+            </DialogTitle>
+            <DialogDescription>
+              Convert points earned by being in the physical world into real money.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleWithdraw} className="space-y-4 pt-2">
+            <div className="rounded-2xl border border-sand bg-paper p-4">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-ink-muted">Available Balance:</span>
+                <span className="font-bold text-ink">{points} pts (~ ${(points / 100).toFixed(2)})</span>
               </div>
-            ))}
+              <div className="mt-2 flex items-center justify-between text-xs text-moss font-semibold">
+                <span>Conversion rate:</span>
+                <span>100 points = $1.00 USD</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
+                Withdrawal Amount ($ USD)
+              </label>
+              <div className="relative">
+                <DollarSign className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  max={(points / 100).toString()}
+                  value={payoutAmount}
+                  onChange={(e) => setPayoutAmount(e.target.value)}
+                  className="pl-8 bg-paper font-semibold text-lg"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
+                Payout Method
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "bank", label: "Bank ACH" },
+                  { id: "paypal", label: "PayPal" },
+                  { id: "local", label: "Local Credit (+15%)" },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setPayoutMethod(m.id as any)}
+                    className={cn(
+                      "rounded-xl border p-2 text-center text-xs font-semibold transition-all",
+                      payoutMethod === m.id
+                        ? "border-stamp bg-stamp-soft text-stamp-ink font-bold"
+                        : "border-sand bg-paper text-ink-muted hover:text-ink"
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-line/50 p-3 text-[11px] text-ink-muted leading-relaxed">
+              <p className="font-semibold text-ink mb-1">Funded by community value, not ad surveillance:</p>
+              Our payout pool is supported by local independent commerce subscriptions and patrons who value digital wellbeing. Zero ads, zero tracking.
+            </div>
+
+            <Button
+              type="submit"
+              disabled={payoutBusy || points <= 0}
+              className="w-full bg-stamp hover:bg-stamp-ink text-primary-foreground font-bold py-3 text-sm"
+            >
+              {payoutBusy ? "Processing Payout..." : `Request $${payoutAmount} Payout`}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* REDEEM VOUCHER MODAL */}
+      <Dialog open={redeemModal !== null} onOpenChange={() => setRedeemModal(null)}>
+        <DialogContent className="border-sand bg-paper-raised sm:max-w-md text-center">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl font-bold">Voucher Ready to Redeem</DialogTitle>
+            <DialogDescription>Show this screen to the cashier or barista</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <Postmark place="VERIFIED" date="TODAY" tone="moss" className="size-24 mx-auto" />
+            <div className="rounded-2xl border-2 border-dashed border-sand bg-paper p-4">
+              <p className="font-hand text-2xl text-ink font-bold">{redeemModal}</p>
+              <p className="mt-2 font-mono text-sm tracking-widest text-stamp-ink font-bold">CODE: OUT-PASS-784</p>
+            </div>
+            <p className="text-xs text-ink-muted">
+              One redemption per visit. Stamped in your Outstagram passport.
+            </p>
           </div>
-        </div>
-      )}
+
+          <Button onClick={() => setRedeemModal(null)} className="w-full bg-ink text-paper-raised">
+            Done
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function Bio({ name, hours }: { name: string; hours: number }) {
+function Bio({ name, hours, points }: { name: string; hours: number; points: number }) {
   return (
     <div className="space-y-1.5 text-sm">
       <p className="font-semibold text-ink">{name}</p>
       <p className="text-ink">Walking more, scrolling less. Collecting stamps, not likes. 📍 Riverside</p>
-      <a className="flex items-center gap-1 font-semibold text-link" href="#"><Link2 className="size-3.5" />outstagram.app/sam</a>
+      <a className="flex items-center gap-1 font-semibold text-link hover:underline" href="#">
+        <Link2 className="size-3.5" />outstagram.app/sam
+      </a>
       <div className="flex flex-wrap gap-1.5 pt-1">
-        <span className="inline-flex items-center gap-1 rounded-full bg-stamp px-2.5 py-1 text-xs font-bold text-primary-foreground"><Hourglass className="size-3" />{hours}h reclaimed</span>
-        {["City explorer", "Pier regular", "Book swapper"].map((t) => <span key={t} className="rounded-full bg-line px-2.5 py-1 text-xs font-semibold text-ink">{t}</span>)}
+        <span className="inline-flex items-center gap-1 rounded-full bg-stamp px-2.5 py-1 text-xs font-bold text-primary-foreground">
+          <Hourglass className="size-3" />{hours}h reclaimed
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-moss/20 px-2.5 py-1 text-xs font-bold text-moss">
+          <Coins className="size-3" />{points} pts (~ ${(points / 100).toFixed(2)})
+        </span>
+        {["City explorer", "Pier regular", "Book swapper"].map((t) => (
+          <span key={t} className="rounded-full bg-line px-2.5 py-1 text-xs font-semibold text-ink">
+            {t}
+          </span>
+        ))}
       </div>
     </div>
   );
