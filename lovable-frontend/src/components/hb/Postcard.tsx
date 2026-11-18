@@ -4,10 +4,31 @@ import { Postmark } from "./Postmark";
 import type { Postcard as P } from "@/lib/store";
 
 export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => void; onOpen?: () => void }) {
+  const isVideo = card.img.startsWith("data:video") || card.img.endsWith(".mp4") || card.img.endsWith(".webm");
+
   return (
     <article className="postcard-frame relative mx-auto w-full max-w-xl rounded-sm">
       <button onClick={onOpen} className="block w-full overflow-hidden rounded-[2px] focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Open postcard from ${card.from}`}>
-        <img src={card.img} alt={`${card.place}, photographed by ${card.from}`} width={1200} height={800} loading="lazy" className="aspect-[3/2] w-full object-cover sepia-[.15]" />
+        {isVideo ? (
+          <video
+            src={card.img}
+            controls
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="aspect-[3/2] w-full object-cover"
+          />
+        ) : (
+          <img
+            src={card.img}
+            alt={`${card.place}, photographed by ${card.from}`}
+            width={1200}
+            height={800}
+            loading="lazy"
+            className="aspect-[3/2] w-full object-cover sepia-[.15]"
+          />
+        )}
       </button>
       <Postmark place={card.place} date={card.date} className="absolute -top-3 -right-3 rounded-full bg-paper-raised/80" />
       <div className="flex items-end justify-between gap-4 px-1 pt-3">
