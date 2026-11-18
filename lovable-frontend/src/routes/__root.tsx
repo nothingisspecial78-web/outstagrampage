@@ -13,6 +13,9 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "@/lib/store";
+import { CallProvider } from "@/lib/call/CallContext";
+import { CallModal } from "@/components/call/CallModal";
+import { IncomingCallDialog } from "@/components/call/IncomingCallDialog";
 import { AppShell } from "@/components/hb/AppShell";
 import { Splash } from "@/components/hb/Splash";
 import { Toaster } from "@/components/ui/sonner";
@@ -134,9 +137,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <StoreProvider>
-        <Splash />
-        <Shell />
-        <Toaster position="top-center" />
+        <CallProvider>
+          <Splash />
+          <Shell />
+          <CallModal />
+          <IncomingCallDialog />
+          <Toaster position="top-center" />
+        </CallProvider>
       </StoreProvider>
     </QueryClientProvider>
   );
@@ -146,12 +153,22 @@ function Shell() {
   const path = useLocation({ select: (l) => l.pathname });
   const { session, ready } = useStore();
   const navigate = useNavigate();
-  const onLogin = path.startsWith("/login");
+  const isPublic = path.startsWith("/login") || path.startsWith("/terms") || path.startsWith("/privacy");
+
   useEffect(() => {
-    if (ready && !session && !onLogin) navigate({ to: "/login", replace: true });
-  }, [ready, session, onLogin, navigate]);
-  if (onLogin) return <Outlet />;
+    if (ready && !session && !isPublic) navigate({ to: "/login", replace: true });
+  }, [ready, session, isPublic, navigate]);
+
+  if (!session && isPublic) {
+    return (
+      <div className="min-h-screen bg-paper">
+        <Outlet />
+      </div>
+    );
+  }
+
   if (!ready || !session) return <div className="grid min-h-screen place-items-center bg-paper text-sm text-ink-muted">Opening Outstagram…</div>;
+
   return (
     <AppShell>
       <Outlet />

@@ -19,9 +19,11 @@ import { Route as MakeRouteImport } from './routes/make'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as MeetRouteImport } from './routes/meet'
 import { Route as PassportRouteImport } from './routes/passport'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as QuestRouteImport } from './routes/quest'
 import { Route as RackRouteImport } from './routes/rack'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ChatsIndexRouteImport } from './routes/chats.index'
 import { Route as ChatsIdRouteImport } from './routes/chats.$id'
 import { Route as PlacesIndexRouteImport } from './routes/places.index'
@@ -77,6 +79,11 @@ const PassportRoute = PassportRouteImport.update({
   path: '/passport',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const QuestRoute = QuestRouteImport.update({
   id: '/quest',
   path: '/quest',
@@ -90,6 +97,11 @@ const RackRoute = RackRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatsIndexRoute = ChatsIndexRouteImport.update({
@@ -124,9 +136,11 @@ export interface FileRoutesByFullPath {
   '/map': typeof MapRoute
   '/meet': typeof MeetRoute
   '/passport': typeof PassportRoute
+  '/privacy': typeof PrivacyRoute
   '/quest': typeof QuestRoute
   '/rack': typeof RackRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/chats/$id': typeof ChatsIdRoute
   '/places/$id': typeof PlacesIdRoute
   '/chats/': typeof ChatsIndexRoute
@@ -143,9 +157,11 @@ export interface FileRoutesByTo {
   '/map': typeof MapRoute
   '/meet': typeof MeetRoute
   '/passport': typeof PassportRoute
+  '/privacy': typeof PrivacyRoute
   '/quest': typeof QuestRoute
   '/rack': typeof RackRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/chats/$id': typeof ChatsIdRoute
   '/places/$id': typeof PlacesIdRoute
   '/chats': typeof ChatsIndexRoute
@@ -163,9 +179,11 @@ export interface FileRoutesById {
   '/map': typeof MapRoute
   '/meet': typeof MeetRoute
   '/passport': typeof PassportRoute
+  '/privacy': typeof PrivacyRoute
   '/quest': typeof QuestRoute
   '/rack': typeof RackRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/chats/$id': typeof ChatsIdRoute
   '/places/$id': typeof PlacesIdRoute
   '/chats/': typeof ChatsIndexRoute
@@ -184,9 +202,11 @@ export interface FileRouteTypes {
     | '/map'
     | '/meet'
     | '/passport'
+    | '/privacy'
     | '/quest'
     | '/rack'
     | '/settings'
+    | '/terms'
     | '/chats/$id'
     | '/places/$id'
     | '/chats/'
@@ -203,9 +223,11 @@ export interface FileRouteTypes {
     | '/map'
     | '/meet'
     | '/passport'
+    | '/privacy'
     | '/quest'
     | '/rack'
     | '/settings'
+    | '/terms'
     | '/chats/$id'
     | '/places/$id'
     | '/chats'
@@ -222,9 +244,11 @@ export interface FileRouteTypes {
     | '/map'
     | '/meet'
     | '/passport'
+    | '/privacy'
     | '/quest'
     | '/rack'
     | '/settings'
+    | '/terms'
     | '/chats/$id'
     | '/places/$id'
     | '/chats/'
@@ -242,9 +266,11 @@ export interface RootRouteChildren {
   MapRoute: typeof MapRoute
   MeetRoute: typeof MeetRoute
   PassportRoute: typeof PassportRoute
+  PrivacyRoute: typeof PrivacyRoute
   QuestRoute: typeof QuestRoute
   RackRoute: typeof RackRoute
   SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   ChatsIdRoute: typeof ChatsIdRoute
   PlacesIdRoute: typeof PlacesIdRoute
   ChatsIndexRoute: typeof ChatsIndexRoute
@@ -323,6 +349,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PassportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/quest': {
       id: '/quest'
       path: '/quest'
@@ -342,6 +375,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chats/': {
@@ -386,9 +426,11 @@ const rootRouteChildren: RootRouteChildren = {
   MapRoute: MapRoute,
   MeetRoute: MeetRoute,
   PassportRoute: PassportRoute,
+  PrivacyRoute: PrivacyRoute,
   QuestRoute: QuestRoute,
   RackRoute: RackRoute,
   SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   ChatsIdRoute: ChatsIdRoute,
   PlacesIdRoute: PlacesIdRoute,
   ChatsIndexRoute: ChatsIndexRoute,

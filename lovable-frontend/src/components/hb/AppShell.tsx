@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut } from "lucide-react";
+import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStore } from "@/lib/store";
@@ -47,7 +47,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isAdmin = session?.role === "admin";
   const path = useLocation({ select: (l) => l.pathname });
   const [panel, setPanel] = useState<Panel>(null);
-  const [tray, setTray] = useState(false);
   const [seenNotes, setSeenNotes] = useState(false);
   const unread = 2;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
@@ -88,6 +87,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <DropdownMenuItem key={m.to} asChild className="rounded-lg p-3"><Link to={m.to}><m.icon className="size-5" />{m.label}</Link></DropdownMenuItem>
                 ))}
                 {isAdmin && <DropdownMenuItem asChild className="rounded-lg p-3 font-semibold text-stamp-ink"><Link to="/admin"><ShieldCheck className="size-5" />Admin console</Link></DropdownMenuItem>}
+                <div className="my-1 border-t border-sand" />
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/terms"><FileText className="size-4" />Terms of Service</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/privacy"><Lock className="size-4" />Privacy Policy</Link></DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-3"><LogOut className="size-5" />Log out {session?.name.split(" ")[0]}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -177,6 +179,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </Link>
                 )}
                 <div className="my-2 border-t border-sand" />
+                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Policies</p>
+                <Link
+                  to="/terms"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                >
+                  <FileText className="size-4" />
+                  <span>Terms of Service</span>
+                </Link>
+                <Link
+                  to="/privacy"
+                  onClick={() => setPanel(null)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                >
+                  <Lock className="size-4" />
+                  <span>Privacy Policy</span>
+                </Link>
+                <div className="my-2 border-t border-sand" />
                 <button
                   type="button"
                   onClick={() => {
@@ -216,7 +236,23 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className={cn("md:pl-[72px] xl:pl-[244px]", collapsed && "xl:pl-[244px]")}>
-        <div className={cn("mx-auto w-full max-w-[960px] pb-20 md:pt-6 md:pb-10", path === "/" ? "px-0 sm:px-4" : "px-4 pt-5 sm:px-6")}>{children}</div>
+        <div className={cn("mx-auto w-full max-w-[960px] pb-20 md:pt-6 md:pb-10", path === "/" ? "px-0 sm:px-4" : "px-4 pt-5 sm:px-6")}>
+          {children}
+          <footer className="mt-16 border-t border-sand/60 pt-6 pb-4 text-center text-xs text-ink-muted">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+              <Link to="/terms" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Terms of Service</Link>
+              <span>·</span>
+              <Link to="/privacy" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Privacy Policy</Link>
+              <span>·</span>
+              <Link to="/places" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Places</Link>
+              <span>·</span>
+              <Link to="/passport" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Rewards & Stamps</Link>
+              <span>·</span>
+              <span>Outstagram © 2026</span>
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink-muted/70">Anti-algorithm · Pro-presence · Zero tracking ads</p>
+          </footer>
+        </div>
       </main>
 
       {/* Mobile bottom nav */}
@@ -229,27 +265,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <li><Link to="/passport" aria-label="Passport"><Avatar src={ME.avatar} size="size-6" className={cn("rounded-full", on("/passport") && "ring-2 ring-ink")} /></Link></li>
         </ul>
       </nav>
-
-      {/* Floating messenger pill */}
-      <div className="fixed right-6 bottom-6 z-30 hidden md:block">
-        {tray && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 absolute right-0 bottom-16 w-80 overflow-hidden rounded-2xl border border-sand bg-paper-raised shadow-postcard">
-            <p className="border-b border-sand px-4 py-3 font-bold text-ink">Messages</p>
-            {chats.map((c, i) => (
-              <Link key={c.id} to="/chats/$id" params={{ id: c.id }} onClick={() => setTray(false)} className="flex items-center gap-3 px-4 py-3 hover:bg-line">
-                <Avatar src={PEOPLE[i]!.avatar} size="size-11" />
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{c.name}</span><span className="block truncate text-xs text-ink-muted">{c.messages.at(-1)?.text}</span></span>
-                <span className="text-[11px] text-ink-muted">{c.messages.length}/{c.limit}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-        <button onClick={() => setTray((t) => !t)} className="flex items-center gap-3 rounded-full border border-sand bg-paper-raised py-3 pr-3 pl-5 shadow-postcard transition-transform hover:scale-[1.02]">
-          <span className="relative"><Send className="size-6" />{badge}</span>
-          <span className="font-semibold text-ink">Messages</span>
-          <span className="flex -space-x-2">{PEOPLE.slice(0, 3).map((p) => <Avatar key={p.handle} src={p.avatar} size="size-6" className="rounded-full ring-2 ring-paper-raised" />)}</span>
-        </button>
-      </div>
     </div>
   );
 }
