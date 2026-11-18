@@ -40,7 +40,7 @@ export class GeminiProvider implements IAIProvider {
 
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
-      const res = await fetch(url, {
+      let res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -50,6 +50,21 @@ export class GeminiProvider implements IAIProvider {
         }),
         signal: controller.signal,
       });
+
+      // Fallback if model returned 404 (e.g. invalid model string)
+      if (!res.ok && res.status === 404 && this.model !== 'gemini-1.5-flash') {
+        const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+        res = await fetch(fallbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: options.systemPrompt }] },
+            contents: [{ parts: [{ text: options.userMessage }] }],
+            generationConfig: { maxOutputTokens: 300, temperature: 0.6 },
+          }),
+          signal: controller.signal,
+        });
+      }
 
       if (!res.ok) {
         const errorText = await res.text();
