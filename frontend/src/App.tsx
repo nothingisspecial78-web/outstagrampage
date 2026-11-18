@@ -566,11 +566,23 @@ export function App() {
                         onDoubleClick={() => handleToggleLike(post.id)}
                         className="relative w-full aspect-square bg-slate-950 flex items-center justify-center overflow-hidden cursor-pointer select-none group"
                       >
-                        <img
-                          src={post.mediaUrl}
-                          alt={post.caption}
-                          className="w-full h-full object-cover"
-                        />
+                        {post.mediaUrl.startsWith('data:video') || post.mediaUrl.endsWith('.mp4') || post.mediaUrl.endsWith('.webm') ? (
+                          <video
+                            src={post.mediaUrl}
+                            controls
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={post.mediaUrl}
+                            alt={post.caption}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                         <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-white flex items-center gap-1 shadow-md">
                           <MapPin className="size-3 text-orange-400" />
                           <span>Live Postcard</span>
