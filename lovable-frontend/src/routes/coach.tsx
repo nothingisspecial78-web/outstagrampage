@@ -95,9 +95,7 @@ function Coach() {
           experiment: res.experiment,
         },
       ]);
-      if (res.source === "fallback") {
-        toast.info("Offline rule fallback engaged.");
-      }
+      
     } catch {
       setThinking(false);
       const nextRemaining = Math.max(0, remainingToday - 1);

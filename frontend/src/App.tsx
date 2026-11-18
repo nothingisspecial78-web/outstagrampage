@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { StoryViewerModal, type StoryItem } from './components/StoryViewerModal';
 import { CreatePostModal } from './components/CreatePostModal';
-import { DirectMessagesDrawer, type ChatThread } from './components/DirectMessagesDrawer';
+import type { ChatThread } from './components/DirectMessagesDrawer';
 import { ReelsView } from './components/ReelsView';
 import { MessagesView } from './components/MessagesView';
 import { ExploreView } from './components/ExploreView';
@@ -775,7 +775,7 @@ export function App() {
         {/* ============================================================ */}
         {/* 4. FLOATING MESSENGER WIDGET (Matching Screenshot Bottom Right) */}
         {/* ============================================================ */}
-        <DirectMessagesDrawer threads={INITIAL_CHATS} />
+        {/* DirectMessagesDrawer removed as requested */}
 
         {/* ============================================================ */}
         {/* MOBILE BOTTOM NAVIGATION BAR (< 768px)                       */}

@@ -102,140 +102,185 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      {/* Slide-out panels */}
+      {/* Slide-out panels & Mobile Drawer */}
       {panel && (
-        <>
-          <button aria-label="Close panel" className="fixed inset-0 z-30 cursor-default" onClick={() => setPanel(null)} />
-          <section className="animate-in slide-in-from-left-4 fade-in fixed inset-y-0 left-0 z-40 w-full overflow-y-auto rounded-r-2xl border-r border-sand bg-paper-raised shadow-postcard duration-200 md:left-[72px] md:w-[397px]">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4">
-              <h2 className="text-2xl font-bold text-ink">{panel === "search" ? "Search" : panel === "menu" ? "Menu" : "Notifications"}</h2>
-              <button onClick={() => setPanel(null)} aria-label="Close" className="rounded-full p-1 hover:bg-line md:hidden"><X className="size-5" /></button>
-            </div>
-            {panel === "search" ? (
-              <SearchPanel onPick={() => setPanel(null)} />
-            ) : panel === "menu" ? (
-              <div className="flex flex-col gap-1 p-4 pb-16">
-                <div className="mb-2 px-3 py-1">
-                  <HoursChip />
-                </div>
-                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Explore</p>
-                <Link
-                  to="/"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
-                >
-                  <Home className="size-5 text-stamp-ink" />
-                  <span>Home</span>
-                </Link>
-                {MORE.map((m) => (
-                  <Link
-                    key={m.to}
-                    to={m.to}
-                    onClick={() => setPanel(null)}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
-                  >
-                    <m.icon className="size-5 text-stamp-ink" />
-                    <span>{m.label}</span>
-                  </Link>
-                ))}
-                <div className="my-2 border-t border-sand" />
-                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Quick Access</p>
-                <Link
-                  to="/rack"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
-                >
-                  <Clapperboard className="size-5 text-stamp-ink" />
-                  <span>Finite Rack</span>
-                </Link>
-                <Link
-                  to="/capture"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
-                >
-                  <PlusSquare className="size-5 text-stamp-ink" />
-                  <span>Capture Moment</span>
-                </Link>
-                <Link
-                  to="/chats"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
-                >
-                  <Send className="size-5 text-stamp-ink" />
-                  <span>Chats ({unread} unread)</span>
-                </Link>
-                <Link
-                  to="/passport"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
-                >
-                  <Avatar src={ME.avatar} size="size-5" />
-                  <span>Passport & Stats</span>
-                </Link>
-                {isAdmin && (
-                  <Link
-                    to="/admin"
-                    onClick={() => setPanel(null)}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-semibold text-stamp-ink transition-colors hover:bg-line"
-                  >
-                    <ShieldCheck className="size-5 text-stamp-ink" />
-                    <span>Admin console</span>
-                  </Link>
-                )}
-                <div className="my-2 border-t border-sand" />
-                <p className="px-3 text-xs font-bold uppercase tracking-wider text-ink-muted">Policies</p>
-                <Link
-                  to="/terms"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
-                >
-                  <FileText className="size-4" />
-                  <span>Terms of Service</span>
-                </Link>
-                <Link
-                  to="/privacy"
-                  onClick={() => setPanel(null)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
-                >
-                  <Lock className="size-4" />
-                  <span>Privacy Policy</span>
-                </Link>
-                <div className="my-2 border-t border-sand" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPanel(null);
-                    signOut();
-                    navigate({ to: "/login" });
-                  }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] font-medium text-destructive transition-colors hover:bg-line"
-                >
-                  <LogOut className="size-5" />
-                  <span>Log out {session?.name ? `(${session.name.split(' ')[0]})` : ''}</span>
-                </button>
+        <div className="fixed inset-0 z-50">
+          <div
+            aria-hidden="true"
+            className="fixed inset-0 bg-ink/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setPanel(null)}
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={panel === "search" ? "Search panel" : panel === "menu" ? "Navigation menu" : "Notifications panel"}
+            className="fixed inset-y-0 left-0 z-[60] flex w-[85vw] max-w-[360px] md:w-[397px] md:left-[72px] flex-col border-r border-sand bg-paper-raised shadow-2xl overflow-hidden"
+          >
+            <div className="flex items-center justify-between border-b border-sand px-5 py-4 bg-paper">
+              <div className="flex items-center gap-2">
+                <Wordmark className="text-2xl text-ink" />
+                <span className="rounded-full bg-stamp-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-stamp-ink">
+                  {panel === "search" ? "Search" : panel === "menu" ? "Menu" : "Notes"}
+                </span>
               </div>
-            ) : (
-              <ul className="px-3">
-                <p className="px-3 pb-2 text-sm font-bold text-ink">This week</p>
-                {NOTES.map((n, i) => (
-                  <li key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-line">
-                    <Avatar src={n.p.avatar} size="size-11" />
-                    <p className="flex-1 text-sm text-ink"><b>{n.p.handle}</b> {n.t} <span className="text-ink-muted">{n.time}</span></p>
-                  </li>
-                ))}
-              </ul>
-            )}
+              <button
+                type="button"
+                onClick={() => setPanel(null)}
+                aria-label="Close"
+                className="flex items-center justify-center size-9 rounded-full text-ink hover:bg-line active:scale-95 cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {panel === "search" ? (
+                <SearchPanel onPick={() => setPanel(null)} />
+              ) : panel === "menu" ? (
+                <div className="flex flex-col gap-1 p-4 pb-20">
+                  <div className="mb-3 px-2 py-1">
+                    <HoursChip />
+                  </div>
+                  <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Main Sections</p>
+                  <Link
+                    to="/"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                  >
+                    <Home className="size-5 text-stamp-ink" />
+                    <span>Home</span>
+                  </Link>
+                  <Link
+                    to="/rack"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                  >
+                    <Clapperboard className="size-5 text-stamp-ink" />
+                    <span>Finite Rack</span>
+                  </Link>
+                  <Link
+                    to="/passport"
+                    search={{ tab: "rewards" }}
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-stamp font-semibold transition-colors hover:bg-line"
+                  >
+                    <Gift className="size-5 text-stamp" />
+                    <span>Rewards & Ticket Passes</span>
+                  </Link>
+                  <Link
+                    to="/capture"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                  >
+                    <PlusSquare className="size-5 text-stamp-ink" />
+                    <span>Capture Moment</span>
+                  </Link>
+                  <Link
+                    to="/chats"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                  >
+                    <Send className="size-5 text-stamp-ink" />
+                    <span className="flex items-center gap-2">
+                      Chats <span className="rounded-full bg-badge px-1.5 py-0.2 text-[10px] font-bold text-primary-foreground">{unread}</span>
+                    </span>
+                  </Link>
+                  <Link
+                    to="/passport"
+                    search={{ tab: "stamps" }}
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                  >
+                    <Avatar src={ME.avatar} size="size-5" />
+                    <span>Passport & Stamps</span>
+                  </Link>
+
+                  <div className="my-2 border-t border-sand" />
+                  <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Explore & Offline Quests</p>
+                  {MORE.map((m) => (
+                    <Link
+                      key={m.to}
+                      to={m.to}
+                      onClick={() => setPanel(null)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
+                    >
+                      <m.icon className="size-5 text-stamp-ink" />
+                      <span>{m.label}</span>
+                    </Link>
+                  ))}
+
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setPanel(null)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-semibold text-stamp-ink transition-colors hover:bg-line"
+                    >
+                      <ShieldCheck className="size-5 text-stamp-ink" />
+                      <span>Admin console</span>
+                    </Link>
+                  )}
+
+                  <div className="my-2 border-t border-sand" />
+                  <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Policies & Account</p>
+                  <Link
+                    to="/terms"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                  >
+                    <FileText className="size-4" />
+                    <span>Terms of Service</span>
+                  </Link>
+                  <Link
+                    to="/privacy"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                  >
+                    <Lock className="size-4" />
+                    <span>Privacy Policy</span>
+                  </Link>
+                  <div className="my-2 border-t border-sand" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel(null);
+                      signOut();
+                      navigate({ to: "/login" });
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] font-medium text-destructive transition-colors hover:bg-line cursor-pointer"
+                  >
+                    <LogOut className="size-5" />
+                    <span>Log out {session?.name ? '(' + session.name.split(' ')[0] + ')' : ''}</span>
+                  </button>
+                </div>
+              ) : (
+                <ul className="px-3 py-4">
+                  <p className="px-3 pb-2 text-sm font-bold text-ink">This week</p>
+                  {NOTES.map((n, i) => (
+                    <li key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-line">
+                      <Avatar src={n.p.avatar} size="size-11" />
+                      <p className="flex-1 text-sm text-ink"><b>{n.p.handle}</b> {n.t} <span className="text-ink-muted">{n.time}</span></p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
-        </>
+        </div>
       )}
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-sand bg-paper-raised px-4 md:hidden">
         <Link to="/"><Wordmark className="text-[30px]" /></Link>
-        <div className="flex items-center gap-5">
-          {isAdmin && <Link to="/admin" aria-label="Admin console" className="text-stamp-ink"><ShieldCheck className="size-6" /></Link>}
-          <button type="button" onClick={() => toggle("menu")} aria-label="Open menu" className="rounded-md p-1 text-ink transition-colors hover:bg-line"><Menu className="size-6" /></button>
-          <Link to="/chats" aria-label="Messages" className="relative"><Send className="size-6" />{badge}</Link>
+        <div className="flex items-center gap-3">
+          {isAdmin && <Link to="/admin" aria-label="Admin console" className="flex items-center justify-center min-h-[44px] min-w-[44px] text-stamp-ink"><ShieldCheck className="size-6" /></Link>}
+          <button
+            type="button"
+            onClick={() => toggle("menu")}
+            aria-label="Open menu"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-ink transition-colors hover:bg-line active:scale-95 cursor-pointer"
+          >
+            <Menu className="size-6 stroke-[2.2]" />
+          </button>
+          <Link to="/chats" aria-label="Messages" className="relative flex items-center justify-center min-h-[44px] min-w-[44px]"><Send className="size-6" />{badge}</Link>
         </div>
       </header>
 

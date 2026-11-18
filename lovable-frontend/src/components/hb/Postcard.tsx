@@ -1,4 +1,5 @@
-import { Heart } from "lucide-react";
+import { Heart, Share2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Postmark } from "./Postmark";
 import { MediaPostPlayer } from "./MediaPostPlayer";
@@ -41,11 +42,42 @@ export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => v
           <p className="font-hand text-2xl leading-tight text-ink">“{card.caption}”</p>
           <p className="mt-1 text-xs uppercase tracking-widest text-ink-muted">{card.from} · {card.place}</p>
         </div>
-        {onThank && (
-          <Button variant="outline" size="sm" onClick={onThank} className="shrink-0 border-sand bg-paper text-stamp-ink hover:bg-line">
-            <Heart className="size-4" /> Send a thank-you
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            onClick={async () => {
+              const shareData = {
+                title: `Outstagram Moment from ${card.place}`,
+                text: `“${card.caption}” — ${card.from} · ${card.place}`,
+                url: window.location.href,
+              };
+              if (navigator.share) {
+                try {
+                  await navigator.share(shareData);
+                  toast.success("Postcard shared!");
+                  return;
+                } catch {}
+              }
+              try {
+                await navigator.clipboard.writeText(window.location.origin + "/rack");
+                toast.success("Postcard link copied to clipboard!");
+              } catch {
+                toast.success("Postcard link ready to share!");
+              }
+            }}
+            className="text-ink-muted hover:text-ink hover:bg-line p-2 rounded-xl"
+            aria-label="Share postcard"
+          >
+            <Share2 className="size-4" />
           </Button>
-        )}
+          {onThank && (
+            <Button variant="outline" size="sm" onClick={onThank} className="border-sand bg-paper text-stamp-ink hover:bg-line font-medium">
+              <Heart className="size-4 mr-1 text-stamp" /> Send note
+            </Button>
+          )}
+        </div>
       </div>
     </article>
   );

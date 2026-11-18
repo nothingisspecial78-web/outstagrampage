@@ -589,9 +589,16 @@ function Capture() {
         </button>
         <h1 className="font-semibold text-ink">Create new post</h1>
         <button
-          onClick={share}
-          disabled={!captionValid(caption) || submitting}
-          className="text-sm font-bold text-link disabled:opacity-40 cursor-pointer"
+          type="button"
+          onClick={() => {
+            if (caption.trim().length < 8) {
+              toast.error("Please write at least 8 characters for your reflection.");
+              return;
+            }
+            share();
+          }}
+          disabled={submitting}
+          className="text-sm font-bold text-link hover:underline cursor-pointer"
         >
           {submitting ? "Sharing…" : "Share"}
         </button>
@@ -702,11 +709,18 @@ function Capture() {
           </div>
 
           <button
-            onClick={share}
-            disabled={!captionValid(caption) || submitting}
-            className="w-full rounded-xl bg-stamp py-3 text-sm font-bold text-primary-foreground transition-opacity disabled:opacity-40 cursor-pointer"
+            type="button"
+            onClick={() => {
+              if (caption.trim().length < 8) {
+                toast.error("Please write at least 8 characters describing this real-world moment.");
+                return;
+              }
+              share();
+            }}
+            disabled={submitting}
+            className="w-full rounded-xl bg-stamp hover:bg-stamp-ink py-3 text-sm font-bold text-primary-foreground shadow-md transition-all active:scale-98 cursor-pointer"
           >
-            {submitting ? "Sharing to today's rack…" : "Share"}
+            {submitting ? "Sharing to today's rack…" : caption.trim().length >= 8 ? "Share to Today's Rack" : "Write at least 8 chars to share"}
           </button>
         </div>
       </div>

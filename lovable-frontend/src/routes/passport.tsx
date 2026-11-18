@@ -378,6 +378,56 @@ function MyProfile() {
       {/* TAB 1: REWARDS & STAMPS: TICKETS, CHALLENGES & BRAND PERKS */}
       {tab === "rewards" && (
         <div className="space-y-8 py-6">
+          {/* Google Fit Live Step Tracking Station */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border-2 border-sky-300 bg-sky-50/70 p-5 shadow-paper">
+            <div className="flex items-center gap-4">
+              <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-md">
+                <Footprints className="size-7" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-800 uppercase tracking-wider">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" /> Google Fit Connected
+                  </span>
+                  <span className="rounded-full bg-stamp-soft px-2 py-0.5 text-[10px] font-bold text-stamp-ink uppercase">
+                    Live REST Sync
+                  </span>
+                </div>
+                <h3 className="mt-1 font-serif text-xl font-bold text-ink">
+                  18,450 Steps Recorded Today
+                </h3>
+                <p className="text-xs text-ink-muted">
+                  Auto-syncing with Lenskart Optical 20,000 steps challenge & Star Air 50,000 steps flight voucher.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:self-center">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  const s = await syncGoogleFitSteps();
+                  // auto-advance step-based challenges
+                  const lenskart = TICKET_PASSES.find((t) => t.id === "lenskart-frame");
+                  if (lenskart) {
+                    setActiveChallenges((prev) => ({ ...prev, [lenskart.id]: Math.min(20000, (prev[lenskart.id] || 16500) + 2000) }));
+                  }
+                  toast.success("Google Fit steps synced! +2,000 steps added to active brand challenges.");
+                }}
+                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm cursor-pointer"
+              >
+                <Zap className="size-3.5 mr-1 text-amber-300" /> Sync Google Fit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => connectGoogleFit()}
+                className="border-sand bg-paper hover:bg-line text-xs font-semibold cursor-pointer"
+              >
+                Manage Permissions
+              </Button>
+            </div>
+          </div>
           {/* A) Presence Points & New User Multiplier Station */}
           <section className="relative overflow-hidden rounded-3xl border border-sand bg-gradient-to-br from-paper-raised via-paper to-sand/20 p-6 shadow-paper">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
