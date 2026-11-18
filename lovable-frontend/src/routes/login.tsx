@@ -142,7 +142,7 @@ function Login() {
   };
 
   const go = (r: Role = role) => {
-    enter(r === "admin" ? "nothingisspecial78@gmail.com" : "sam@outstagram.app", r, undefined);
+    enter(r === "admin" ? "admin@outstagram.app" : "sam@outstagram.app", r, undefined);
   };
 
   const submit = async () => {
@@ -290,16 +290,16 @@ function Login() {
             <button
               type="button"
               onClick={() => quickLogin("sam@outstagram.app", "abdu@1027", "user", "Sam Okafor")}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-ink px-3 py-3 text-sm font-bold text-paper-raised shadow-paper hover:-translate-y-0.5 transition-transform"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-ink px-3 py-3 text-sm font-bold text-paper-raised shadow-paper hover:-translate-y-0.5 transition-transform cursor-pointer"
             >
-              <User className="size-4" />Demo Member (Sam Okafor)
+              <User className="size-4" />Demo Member (Sam)
             </button>
             <button
               type="button"
-              onClick={() => quickLogin("nothingisspecial78@gmail.com", "abdu@1027", "admin", "Abdu Admin")}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-stamp px-3 py-3 text-sm font-bold text-primary-foreground shadow-paper hover:-translate-y-0.5 transition-transform"
+              onClick={() => enter("guest@outstagram.app", "user", "Guest", "Welcome, Guest!")}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised px-3 py-3 text-sm font-bold text-ink shadow-paper hover:-translate-y-0.5 transition-transform cursor-pointer"
             >
-              <ShieldCheck className="size-4" />Admin (nothingisspecial78@gmail.com)
+              <Sparkles className="size-4 text-stamp" />Explore as Guest
             </button>
           </div>
           <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-sand bg-paper-raised px-4 py-3">
@@ -318,7 +318,8 @@ function Login() {
                   setRole(r);
                   if (r === "admin") {
                     setMode("in");
-                    if (!email) setEmail("nothingisspecial78@gmail.com");
+                    setEmail("");
+                    setPassword("");
                   }
                 }}
                 className={cn("flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all", role === r ? "bg-paper-raised text-ink shadow-paper" : "text-ink-muted hover:text-ink")}
@@ -327,7 +328,7 @@ function Login() {
               </button>
             ))}
           </div>
-          {role === "admin" && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Admins review reports, approve partner offers, manage members and set daily quests. Default admin: nothingisspecial78@gmail.com</p>}
+          {role === "admin" && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Sign in with authorized administrator credentials to review reports, approve partner offers, manage members and set daily quests.</p>}
           <form className="mt-5 space-y-3.5" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
             {mode === "up" && <Field icon={User}><input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className={inputCls} /></Field>}
             <Field icon={Mail}><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={role === "admin" ? "Admin email" : "Email or phone"} className={inputCls} /></Field>

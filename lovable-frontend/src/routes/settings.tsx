@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { ChevronRight, UserRound, Bell, Lock, Copy, UserPlus, LogOut, ShieldCheck, FlaskConical, Timer, Footprints, KeyRound, Sparkles, Hammer, Users, MapPinned, Store, FileText } from "lucide-react";
+import { ChevronRight, UserRound, Bell, Lock, Copy, UserPlus, LogOut, ShieldCheck, FlaskConical, Timer, Footprints, KeyRound, Sparkles, Hammer, Users, MapPinned, Store, FileText, Compass } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +83,14 @@ function Settings() {
       </Group>
 
       <Group title="About & Policies">
+        <Link to="/about" className="flex w-full items-center gap-3 px-4 py-3.5 hover:bg-line/60">
+          <Compass className="size-5 text-ink" />
+          <span className="flex-1 text-left">
+            <span className="block text-sm font-medium text-ink">About Outstagram</span>
+            <span className="block text-xs text-ink-muted">The anti-Instagram manifesto & philosophy</span>
+          </span>
+          <ChevronRight className="size-4 text-ink-muted" />
+        </Link>
         <Link to="/terms" className="flex w-full items-center gap-3 px-4 py-3.5 hover:bg-line/60">
           <FileText className="size-5 text-ink" />
           <span className="flex-1 text-left">
@@ -131,3 +139,4 @@ function Settings() {
     </div>
   );
 }
+

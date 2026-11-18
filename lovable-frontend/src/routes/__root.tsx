@@ -155,7 +155,7 @@ function Shell() {
   const path = useLocation({ select: (l) => l.pathname });
   const { session, ready } = useStore();
   const navigate = useNavigate();
-  const isPublic = path.startsWith("/login") || path.startsWith("/terms") || path.startsWith("/privacy");
+  const isPublic = path.startsWith("/login") || path.startsWith("/terms") || path.startsWith("/privacy") || path.startsWith("/about");
 
   useEffect(() => {
     if (ready && !session && !isPublic) navigate({ to: "/login", replace: true });

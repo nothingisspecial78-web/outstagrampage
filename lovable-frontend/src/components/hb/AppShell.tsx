@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift } from "lucide-react";
+import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift, Compass } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStore } from "@/lib/store";
@@ -94,6 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="my-1 border-t border-sand" />
                 <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/terms"><FileText className="size-4" />Terms of Service</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/privacy"><Lock className="size-4" />Privacy Policy</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/about"><Compass className="size-4" />About Outstagram</Link></DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-3"><LogOut className="size-5" />Log out {session?.name ? session.name.split(" ")[0] : ""}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -104,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Slide-out panels & Mobile Drawer */}
       {panel && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-[80]">
           <div
             aria-hidden="true"
             className="fixed inset-0 bg-ink/40 backdrop-blur-xs transition-opacity"
@@ -114,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             role="dialog"
             aria-modal="true"
             aria-label={panel === "search" ? "Search panel" : panel === "menu" ? "Navigation menu" : "Notifications panel"}
-            className="fixed inset-y-0 left-0 z-[60] flex w-[85vw] max-w-[360px] md:w-[397px] md:left-[72px] flex-col border-r border-sand bg-paper-raised shadow-2xl overflow-hidden"
+            className="fixed inset-y-0 right-0 z-[90] flex w-[85vw] max-w-[360px] md:right-auto md:left-[72px] md:w-[397px] flex-col border-l md:border-l-0 md:border-r border-sand bg-paper-raised shadow-2xl overflow-hidden animate-in slide-in-from-right md:slide-in-from-left duration-200"
           >
             <div className="flex items-center justify-between border-b border-sand px-5 py-4 bg-paper">
               <div className="flex items-center gap-2">
@@ -237,6 +238,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Lock className="size-4" />
                     <span>Privacy Policy</span>
                   </Link>
+                  <Link
+                    to="/about"
+                    onClick={() => setPanel(null)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-ink-muted hover:text-ink hover:bg-line"
+                  >
+                    <Compass className="size-4" />
+                    <span>About Outstagram</span>
+                  </Link>
                   <div className="my-2 border-t border-sand" />
                   <button
                     type="button"
@@ -276,7 +285,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             type="button"
             onClick={() => toggle("menu")}
             aria-label="Open menu"
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-ink transition-colors hover:bg-line active:scale-95 cursor-pointer"
+            aria-expanded={panel === "menu"}
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-ink transition-colors hover:bg-line active:scale-95 cursor-pointer touch-manipulation select-none"
           >
             <Menu className="size-6 stroke-[2.2]" />
           </button>
@@ -289,7 +299,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
           <footer className="mt-16 border-t border-sand/60 pt-6 pb-4 text-center text-xs text-ink-muted">
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-              <Link to="/terms" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Terms of Service</Link>
+              <Link to="/about" className="hover:text-ink transition-colors underline-offset-2 hover:underline">About</Link>
+                <span>•</span>
+                <Link to="/terms" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Terms of Service</Link>
               <span>·</span>
               <Link to="/privacy" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Privacy Policy</Link>
               <span>·</span>
