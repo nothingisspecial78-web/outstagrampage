@@ -9,6 +9,7 @@ import {
 import { callSounds } from "./sound";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 
 export interface CallContextType {
   status: CallStatus;
@@ -49,15 +50,65 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [incomingCall, setIncomingCall] = useState<SignalingPayload | null>(null);
 
   const durationTimerRef = useRef<number | null>(null);
+  const ringTimeoutRef = useRef<number | null>(null);
   const autoConnectTimerRef = useRef<number | null>(null);
   const callStartTimeRef = useRef<number | null>(null);
 
   // Self identity
   const currentSelf: CallPeerInfo = {
-    id: session?.email || "self_user",
-    name: session?.name || "Sam Okafor",
+    id: session?.id || session?.email || "self_user",
+    name: session?.name || "Member",
     avatar: "",
   };
+
+  // Dedicated incoming call listener on the logged-in user's personal channel(s)
+  useEffect(() => {
+    const rawIds = [
+      session?.id,
+      session?.email,
+      session?.friendCode,
+      session?.name,
+    ].filter(Boolean) as string[];
+
+    if (rawIds.length === 0) return;
+
+    const uniqueClean = Array.from(
+      new Set(rawIds.map((id) => id.replace(/[^a-zA-Z0-9_-]/g, "_")))
+    );
+
+    const channels = uniqueClean.map((cleanId) => {
+      const channelName = `user_call_${cleanId}`;
+      const ch = supabase.channel(channelName, {
+        config: { broadcast: { self: false } },
+      });
+
+      ch.on("broadcast", { event: "call_invite" }, ({ payload }) => {
+        console.log(`[CallContext] Incoming call invite on ${channelName}:`, payload);
+        if (status !== "idle") {
+          const roomId = payload.roomId || `call_room_${payload.callId}`;
+          webrtc.sendSignalToChannel(roomId, "call_reject", {
+            ...payload,
+            from: currentSelf,
+            reason: "busy",
+          });
+          return;
+        }
+        setIncomingCall(payload as SignalingPayload);
+        callSounds.startIncomingRingtone();
+      });
+
+      ch.subscribe();
+      return ch;
+    });
+
+    return () => {
+      channels.forEach((ch) => {
+        try {
+          supabase.removeChannel(ch);
+        } catch {}
+      });
+    };
+  }, [session?.id, session?.email, session?.friendCode, session?.name, status, currentSelf]);
 
   // Keep remote stream updated
   useEffect(() => {
@@ -112,12 +163,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     async (event: string, payload: SignalingPayload) => {
       console.log(`[WebRTC] Received signal: ${event}`, payload);
 
-      // Verify if signal belongs to current user or chat
       if (event === "call_invite") {
-        // Someone is calling us!
         if (status !== "idle") {
-          // We are busy
-          await webrtc.sendSignal("call_reject", {
+          const roomId = payload.roomId || `call_room_${payload.callId}`;
+          await webrtc.sendSignalToChannel(roomId, "call_reject", {
             ...payload,
             from: currentSelf,
             reason: "busy",
@@ -130,22 +179,24 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Check callId match for existing session
+      // Check callId match for active session
       if (callId && payload.callId !== callId) return;
 
       if (event === "call_accept") {
         // Peer accepted! Initiate WebRTC offer
         callSounds.stopRingtone();
-        if (autoConnectTimerRef.current) {
-          clearTimeout(autoConnectTimerRef.current);
-          autoConnectTimerRef.current = null;
+        if (ringTimeoutRef.current) {
+          clearTimeout(ringTimeoutRef.current);
+          ringTimeoutRef.current = null;
         }
 
         setStatus("connecting");
         try {
+          const callRoom = payload.roomId || `call_room_${payload.callId}`;
           const pc = webrtc.createPeerConnection((candidate) => {
             webrtc.sendSignal("webrtc_ice_candidate", {
               callId: payload.callId,
+              roomId: callRoom,
               chatId: payload.chatId,
               from: currentSelf,
               type: payload.type,
@@ -156,6 +207,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           const offer = await webrtc.createOffer();
           await webrtc.sendSignal("webrtc_offer", {
             callId: payload.callId,
+            roomId: callRoom,
             chatId: payload.chatId,
             from: currentSelf,
             type: payload.type,
@@ -169,9 +221,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       } else if (event === "webrtc_offer") {
         // Callee receives offer -> create answer
         try {
+          const callRoom = payload.roomId || `call_room_${payload.callId}`;
           const answer = await webrtc.handleOffer(payload.sdp!);
           await webrtc.sendSignal("webrtc_answer", {
             callId: payload.callId,
+            roomId: callRoom,
             chatId: payload.chatId,
             from: currentSelf,
             type: payload.type,
@@ -216,18 +270,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     [status, callId, peer, chatId, callType, duration, currentSelf]
   );
 
-  // Subscribe to chat signaling channel when in a chat or on root
-  const activeChatId = chatId;
-  useEffect(() => {
-    if (activeChatId) {
-      webrtc.subscribeSignaling(activeChatId, handleSignal);
-    }
-  }, [activeChatId, handleSignal]);
-
-  // Start outgoing call
+  // Start outgoing call to peer
   const startCall = async (targetChatId: string, targetPeer: CallPeerInfo, type: CallType) => {
     try {
+      cleanupCall();
+
       const newCallId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const callRoom = `call_room_${newCallId}`;
       setChatId(targetChatId);
       setCallId(newCallId);
       setPeer(targetPeer);
@@ -236,8 +285,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setIsMuted(false);
       setIsCameraOff(false);
 
-      // Subscribe signaling
-      webrtc.subscribeSignaling(targetChatId, handleSignal);
+      // Subscribe caller to the dedicated call room for WebRTC negotiation
+      webrtc.subscribeSignaling(callRoom, handleSignal);
 
       // Acquire local media
       const stream = await webrtc.getLocalMedia(type);
@@ -246,20 +295,44 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       // Start outgoing ringtone
       callSounds.startOutgoingRingtone();
 
-      // Dispatch invite signal
-      await webrtc.sendSignal("call_invite", {
+      const invitePayload: SignalingPayload = {
         callId: newCallId,
         chatId: targetChatId,
+        roomId: callRoom,
         from: currentSelf,
         to: targetPeer,
         type,
-      });
+      };
 
-      // Solo demo fallback: If no response after 6 seconds, simulate auto-answer
-      // This allows immediate testing of call controls, timer, camera & audio
-      autoConnectTimerRef.current = window.setTimeout(() => {
-        simulateAnswer();
-      }, 6000);
+      // 1. Dispatch invite directly to peer's personal user channel
+      const targetUserId = (targetPeer.id || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+      if (targetUserId) {
+        await webrtc.sendSignalToChannel(`user_call_${targetUserId}`, "call_invite", invitePayload);
+      }
+      const cleanPeerName = (targetPeer.name || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+      if (cleanPeerName && cleanPeerName !== targetUserId) {
+        await webrtc.sendSignalToChannel(`user_call_${cleanPeerName}`, "call_invite", invitePayload);
+      }
+
+      // 2. Also dispatch to chat channel for fallback
+      const cleanChatId = targetChatId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      if (cleanChatId && cleanChatId !== targetUserId && cleanChatId !== cleanPeerName) {
+        await webrtc.sendSignalToChannel(`user_call_${cleanChatId}`, "call_invite", invitePayload);
+        await webrtc.sendSignalToChannel(`call_${cleanChatId}`, "call_invite", invitePayload);
+      }
+
+      // 3. Ring timeout (35 seconds) - NO simulated auto answer!
+      ringTimeoutRef.current = window.setTimeout(() => {
+        setStatus((curr) => {
+          if (curr === "calling") {
+            callSounds.stopRingtone();
+            callSounds.playEndTone();
+            toast.info(`${targetPeer.name || "User"} did not answer.`);
+            cleanupCall();
+          }
+          return curr;
+        });
+      }, 35000);
     } catch (err: any) {
       console.error("Failed to start call:", err);
       toast.error(err.name === "NotAllowedError" ? "Camera/Microphone permission denied" : "Could not access media devices");
@@ -283,7 +356,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIsCameraOff(false);
 
     try {
-      webrtc.subscribeSignaling(incoming.chatId, handleSignal);
+      const callRoom = incoming.roomId || `call_room_${incoming.callId}`;
+      webrtc.subscribeSignaling(callRoom, handleSignal);
 
       // Callee acquires local media
       const stream = await webrtc.getLocalMedia(incoming.type);
@@ -293,6 +367,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       webrtc.createPeerConnection((candidate) => {
         webrtc.sendSignal("webrtc_ice_candidate", {
           callId: incoming.callId,
+          roomId: callRoom,
           chatId: incoming.chatId,
           from: currentSelf,
           type: incoming.type,
@@ -303,6 +378,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       // Callee sends call_accept signal
       await webrtc.sendSignal("call_accept", {
         callId: incoming.callId,
+        roomId: callRoom,
         chatId: incoming.chatId,
         from: currentSelf,
         type: incoming.type,
@@ -318,7 +394,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const rejectCall = async (reason = "declined") => {
     callSounds.stopRingtone();
     if (incomingCall) {
-      await webrtc.sendSignal("call_reject", {
+      const callRoom = incomingCall.roomId || `call_room_${incomingCall.callId}`;
+      await webrtc.sendSignalToChannel(callRoom, "call_reject", {
         ...incomingCall,
         from: currentSelf,
         reason,
@@ -328,43 +405,37 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     cleanupCall();
   };
 
-  // Simulate answer for solo test / demo
+  // Simulate answer for unit testing only
   const simulateAnswer = () => {
-    if (autoConnectTimerRef.current) {
-      clearTimeout(autoConnectTimerRef.current);
-      autoConnectTimerRef.current = null;
+    if (ringTimeoutRef.current) {
+      clearTimeout(ringTimeoutRef.current);
+      ringTimeoutRef.current = null;
     }
     callSounds.stopRingtone();
     setStatus("connected");
     callSounds.playConnectedTone();
-
-    // In simulated solo mode, mirror local stream as remote stream for testing preview
-    const currentLocal = webrtc.getLocalStream();
-    if (currentLocal) {
-      setRemoteStream(currentLocal);
-    }
   };
 
   // End active call
   const endCall = () => {
-    if (autoConnectTimerRef.current) {
-      clearTimeout(autoConnectTimerRef.current);
-      autoConnectTimerRef.current = null;
+    if (ringTimeoutRef.current) {
+      clearTimeout(ringTimeoutRef.current);
+      ringTimeoutRef.current = null;
     }
     callSounds.stopRingtone();
     callSounds.playEndTone();
 
-    if (callId && chatId) {
+    if (callId) {
       webrtc.sendSignal("call_end", {
         callId,
-        chatId,
+        chatId: chatId || "chat",
         from: currentSelf,
         type: callType,
       });
 
-      if (duration > 0) {
+      if (chatId && duration > 0) {
         logCallEvent(chatId, callType, "completed", duration);
-      } else {
+      } else if (chatId) {
         logCallEvent(chatId, callType, "missed");
       }
     }
@@ -378,6 +449,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     if (durationTimerRef.current !== null) {
       clearInterval(durationTimerRef.current);
       durationTimerRef.current = null;
+    }
+    if (ringTimeoutRef.current !== null) {
+      clearTimeout(ringTimeoutRef.current);
+      ringTimeoutRef.current = null;
     }
     if (autoConnectTimerRef.current !== null) {
       clearTimeout(autoConnectTimerRef.current);

@@ -21,23 +21,25 @@ import { EnvelopeLock } from "@/components/hb/EnvelopeLock";
 import { CodeSheet } from "@/components/hb/CodeSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ME, PEOPLE, searchPeople, type Person } from "@/lib/people";
+import { ME, searchRealUsers, getCachedRealUsers, type Person } from "@/lib/people";
 import { useStore, type Chat } from "@/lib/store";
 import { useCall } from "@/lib/call/CallContext";
 import { VoiceRecorder } from "@/components/hb/dm/VoiceRecorder";
 import { AudioMessagePlayer } from "@/components/hb/dm/AudioMessagePlayer";
 import { cn } from "@/lib/utils";
 
-function personFor(name: string) {
-  return [...PEOPLE, ...searchPeople("")].find(
-    (p) => p.name.split(" ")[0]?.toLowerCase() === name.split(" ")[0]?.toLowerCase()
+function personFor(name: string, peerId?: string) {
+  const all = getCachedRealUsers();
+  return all.find(
+    (p) => (peerId && p.id === peerId) || p.name.toLowerCase() === name.toLowerCase() || p.handle === name
   );
 }
 
-function Face({ name, size = "size-11" }: { name: string; size?: string }) {
-  const person = personFor(name);
-  return person ? (
-    <Avatar src={person.avatar} size={size} />
+function Face({ name, avatar, size = "size-11" }: { name: string; avatar?: string; size?: string }) {
+  const person = personFor(name, undefined);
+  const src = avatar || person?.avatar || (name ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}` : undefined);
+  return src ? (
+    <Avatar src={src} size={size} />
   ) : (
     <span
       className={cn(
@@ -63,10 +65,7 @@ function Thread({ chat, active }: { chat: Chat; active: boolean }) {
       )}
     >
       <span className="relative">
-        <Face name={chat.name} size="size-12" />
-        {["maya", "priya"].includes(chat.id) && (
-          <i className="absolute right-0 bottom-0 size-3 rounded-full border-2 border-paper-raised bg-moss" />
-        )}
+        <Face name={chat.name} avatar={chat.peerAvatar} size="size-12" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex justify-between gap-2">
@@ -97,7 +96,7 @@ function PersonRow({ p, onPick }: { p: Person; onPick: (p: Person) => void }) {
       <img src={p.avatar} alt="" className="size-10 rounded-full object-cover" />
       <span className="min-w-0">
         <b className="block truncate text-sm text-ink">{p.name}</b>
-        <small className="text-xs text-ink-muted">@{p.handle}</small>
+        <small className="text-xs text-ink-muted">@{p.handle}{p.friendCode ? ` · code: ${p.friendCode}` : ""}</small>
       </span>
     </button>
   );
@@ -109,17 +108,39 @@ function ThreadList({ selected }: { selected: string | undefined }) {
   const [query, setQuery] = useState("");
   const [picker, setPicker] = useState(false);
   const [pq, setPq] = useState("");
+  const [realPeople, setRealPeople] = useState<Person[]>([]);
+  const [pickerPeople, setPickerPeople] = useState<Person[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    searchRealUsers(query, session?.id || session?.name).then((res) => {
+      if (active) setRealPeople(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, [query, session?.id, session?.name]);
+
+  useEffect(() => {
+    let active = true;
+    searchRealUsers(pq, session?.id || session?.name).then((res) => {
+      if (active) setPickerPeople(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, [pq, session?.id, session?.name]);
 
   const open = (p: Person) => {
-    const id = startChat(p.name);
+    const id = startChat(p.name, p.id, p.avatar);
     setPicker(false);
     setQuery("");
     nav({ to: "/chats/$id", params: { id } });
   };
 
-  const chatIds = new Set(chats.map((c) => c.id));
+  const chatIds = new Set(chats.map((c) => c.peerId || c.id));
   const newPeople = query.trim()
-    ? searchPeople(query).filter((p) => !chatIds.has(p.name.split(" ")[0]!.toLowerCase()))
+    ? realPeople.filter((p) => !chatIds.has(p.id || p.handle))
     : [];
   const handle = session?.name || ME.handle;
   const filtered = chats.filter(
@@ -154,7 +175,7 @@ function ThreadList({ selected }: { selected: string | undefined }) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search"
+            placeholder="Search by name, code or handle"
             className="h-9 rounded-lg border-0 bg-line pl-9 shadow-none"
           />
         </label>
@@ -176,7 +197,7 @@ function ThreadList({ selected }: { selected: string | undefined }) {
           </>
         )}
         {!filtered.length && !newPeople.length && (
-          <p className="p-6 text-sm text-ink-muted">No conversations found.</p>
+          <p className="p-6 text-sm text-ink-muted">No conversations yet. Use the pencil icon or search above to find registered friends.</p>
         )}
       </div>
       <Dialog open={picker} onOpenChange={setPicker}>
@@ -193,11 +214,11 @@ function ThreadList({ selected }: { selected: string | undefined }) {
             />
           </div>
           <div className="max-h-80 overflow-y-auto pb-3">
-            {searchPeople(pq).map((p) => (
+            {pickerPeople.map((p) => (
               <PersonRow key={p.handle} p={p} onPick={open} />
             ))}
-            {!searchPeople(pq).length && (
-              <p className="p-4 text-sm text-ink-muted">Nobody found.</p>
+            {!pickerPeople.length && (
+              <p className="p-4 text-sm text-ink-muted">No members found. Ask friends to sign up to connect!</p>
             )}
           </div>
         </DialogContent>
@@ -218,15 +239,15 @@ function Conversation({ chat }: { chat: Chat }) {
     end.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat.messages.length]);
 
-  const person = personFor(chat.name);
+  const person = personFor(chat.name, chat.peerId);
 
   const initiateCall = (type: "voice" | "video") => {
     startCall(
       chat.id,
       {
-        id: chat.id,
+        id: chat.peerId || chat.id,
         name: chat.name,
-        avatar: person?.avatar || "",
+        avatar: chat.peerAvatar || person?.avatar || "",
       },
       type
     );
@@ -238,7 +259,7 @@ function Conversation({ chat }: { chat: Chat }) {
         <Link to="/chats" className="md:hidden" aria-label="Back to messages">
           <ArrowLeft className="size-5" />
         </Link>
-        <Face name={chat.name} size="size-10" />
+        <Face name={chat.name} avatar={chat.peerAvatar} size="size-10" />
         <div className="min-w-0 flex-1">
           <b className="block truncate text-sm text-ink">{chat.name}</b>
           <small className="text-xs text-ink-muted">Active now</small>
