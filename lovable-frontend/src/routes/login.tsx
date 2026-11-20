@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { saveRegisteredUser } from "@/lib/people";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Wordmark } from "@/components/hb/AppShell";
@@ -48,9 +49,18 @@ function Login() {
   const { signIn, demo, setDemo } = useStore();
   const nav = useNavigate();
 
-  const enter = (mail: string, r: Role, n?: string, msg?: string) => {
-    signIn(mail, r, n);
-    toast.success(msg ?? `Welcome${n ? `, ${n.split(" ")[0]}` : ""}!`);
+  const enter = (mail: string, r: Role, n?: string, msg?: string, id?: string, friendCode?: string) => {
+    const userId = id || mail;
+    const displayName = n || (r === "admin" ? "Admin" : mail.split("@")[0]);
+    signIn(mail, r, displayName, userId, friendCode);
+    saveRegisteredUser({
+      id: userId,
+      name: displayName,
+      handle: friendCode ? friendCode.toLowerCase() : mail.split("@")[0],
+      friendCode,
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+    });
+    toast.success(msg ?? `Welcome${displayName ? `, ${displayName.split(" ")[0]}` : ""}!`);
     nav({ to: r === "admin" ? "/admin" : "/" });
   };
 
@@ -174,23 +184,23 @@ function Login() {
         }
 
         let userRole: Role = isSpecialAdmin ? "admin" : (role === "admin" ? "admin" : "user");
-        let displayName = userRole === "admin" ? "Abdu Admin" : "Member";
+        let displayName = userRole === "admin" ? "Admin" : mail.split("@")[0];
+        let userId = authData?.user?.id || mail;
+        let friendCode: string | undefined = undefined;
 
         if (authData?.user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role, display_name")
+            .select("display_name, friend_code")
             .eq("id", authData.user.id)
             .maybeSingle();
 
           if (profile) {
-            if (profile.role === "admin" || isSpecialAdmin) {
-              userRole = "admin";
-            } else {
-              userRole = "user";
-            }
             if (profile.display_name) {
               displayName = profile.display_name;
+            }
+            if (profile.friend_code) {
+              friendCode = profile.friend_code;
             }
           }
         }
@@ -199,7 +209,7 @@ function Login() {
           userRole = "admin";
         }
 
-        enter(mail, userRole, displayName, `Welcome${displayName ? `, ${displayName.split(" ")[0]}` : ""}!`);
+        enter(mail, userRole, displayName, `Welcome, ${displayName}!`, userId, friendCode);
       } catch (err: any) {
         const msg = err?.message || "Failed to sign in. Please try again.";
         setError(msg);
@@ -234,15 +244,16 @@ function Login() {
 
         const user = authData?.user;
         const userRole: Role = "user";
-        const rawMetaName = user?.user_metadata ? (user.user_metadata['display_name'] as string | undefined) : undefined;
-        const displayName = trimmedName || rawMetaName || "Member";
+        const displayName = trimmedName;
+        const userId = user?.id || `u_${Date.now()}`;
+        const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
         if (user) {
           try {
             await supabase.from("profiles").upsert({
               id: user.id,
               display_name: displayName,
-              role: "member",
+              friend_code: generatedCode,
             });
           } catch (pErr) {
             console.warn("Could not upsert profile:", pErr);
@@ -255,7 +266,7 @@ function Login() {
           }
         }
 
-        enter(mail, userRole, displayName, "Account created — welcome!");
+        enter(mail, userRole, displayName, "Account created — welcome!", userId, generatedCode);
       } catch (err: any) {
         const msg = err?.message || "An unexpected error occurred during signup.";
         setError(msg);
@@ -285,27 +296,6 @@ function Login() {
           <Wordmark className="relative text-3xl lg:hidden [&_*]:text-paper-raised" />
           <h1 className="mt-40 font-serif text-3xl font-semibold text-ink lg:mt-0 lg:text-4xl">{mode === "in" ? "Welcome Back" : "Get Started"}</h1>
           <p className="mt-1.5 text-sm text-ink-muted">{mode === "in" ? "Sign in. One quest, ten postcards, then go outside." : "Create an account. No likes, no followers."}</p>
-
-          <div className="mt-6 grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => quickLogin("sam@outstagram.app", "abdu@1027", "user", "Sam Okafor")}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-ink px-3 py-3 text-sm font-bold text-paper-raised shadow-paper hover:-translate-y-0.5 transition-transform cursor-pointer"
-            >
-              <User className="size-4" />Demo Member (Sam)
-            </button>
-            <button
-              type="button"
-              onClick={() => enter("guest@outstagram.app", "user", "Guest", "Welcome, Guest!")}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised px-3 py-3 text-sm font-bold text-ink shadow-paper hover:-translate-y-0.5 transition-transform cursor-pointer"
-            >
-              <Sparkles className="size-4 text-stamp" />Explore as Guest
-            </button>
-          </div>
-          <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-sand bg-paper-raised px-4 py-3">
-            <span><span className="block text-sm font-bold text-ink">Enable Demo Mode</span><span className="text-xs text-ink-muted">Simulates GPS location at Riverside Cafe for testing</span></span>
-            <Switch checked={demo} onCheckedChange={(v) => { setDemo(v); toast(v ? "Demo mode on" : "Demo mode off"); }} aria-label="Enable Demo Mode" />
-          </label>
 
           <div role="tablist" aria-label="Account type" className="mt-6 grid grid-cols-2 rounded-2xl border border-sand bg-paper p-1">
             {(["user", "admin"] as const).map((r) => (

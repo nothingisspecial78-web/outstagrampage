@@ -23,7 +23,7 @@ export type Msg = {
     duration?: number;
   };
 };
-export type Chat = { id: string; name: string; place: string; limit: number; messages: Msg[] };
+export type Chat = { id: string; peerId?: string; peerAvatar?: string; name: string; place: string; limit: number; messages: Msg[] };
 export type Craft = { id: string; title: string; mediums: string[]; notes: string; date: string };
 
 const imgs = [cafe, garden, books, pier];
@@ -41,60 +41,29 @@ const captions = [
   "Bought a lantern I don't need.",
   "Missed the tram. Glad I did.",
 ];
-export const RACK: Postcard[] = places.map((p, i) => ({
+export const DEMO_RACK: Postcard[] = places.map((p, i) => ({
   id: `pc${i}`, from: names[i]!, place: p, date: `NOV ${16 - (i % 5)}`, img: imgs[i % 4]!, caption: captions[i]!,
 }));
+export const RACK: Postcard[] = [];
 
-const mkMsgs = (n: number): Msg[] =>
-  Array.from({ length: n }, (_, i) => ({
-    id: `m${i}`, mine: i % 2 === 1,
-    text: ["Are you around Saturday?", "Maybe! Where?", "The pier, around five?", "I'll bring the thermos.", "Perfect. Bring a scarf too.", "Deal.", "Did you finish that book?", "Two chapters left.", "No spoilers then.", "Promise."][i % 10]!,
-  }));
-
-const initialChats: Chat[] = [
-  { id: "maya", name: "Maya", place: "West Pier", limit: 20, messages: mkMsgs(20) },
-  { id: "jonas", name: "Jonas", place: "Remparts Books", limit: 20, messages: mkMsgs(14) },
-  { id: "priya", name: "Priya", place: "Linden Park", limit: 20, messages: mkMsgs(6) },
-];
-
-const initialStamps: Stamp[] = [
-  { id: "s1", kind: "place", label: "West Pier", date: "NOV 12" },
-  { id: "s2", kind: "meetup", label: "with Priya", date: "NOV 10" },
-  { id: "s3", kind: "quest", label: "Notice 3 things", date: "NOV 09" },
-  { id: "s4", kind: "place", label: "Old Greenhouse", date: "NOV 07" },
-  { id: "s5", kind: "craft", label: "Linocut", date: "NOV 03" },
-];
-
-const initialCrafts: Craft[] = [
-  { id: "c1", title: "Linocut of the pier", mediums: ["linocut", "ink"], notes: "Carved too deep on the left rail. Love it anyway.", date: "NOV 03" },
-  { id: "c2", title: "Sourdough, attempt four", mediums: ["baking"], notes: "Finally an ear. Shared half with the neighbor.", date: "OCT 28" },
-];
+const initialChats: Chat[] = [];
+const initialStamps: Stamp[] = [];
+const initialCrafts: Craft[] = [];
 
 export type Role = "user" | "admin";
-export type Session = { name: string; email: string; role: Role };
+export type Session = { id?: string; name: string; email: string; role: Role; friendCode?: string };
 export type Report = { id: string; what: string; by: string; reason: string; status: "open" | "kept" | "removed" };
 export type Offer = { id: string; place: string; partner: string; text: string; status: "pending" | "live" | "rejected" };
 export type Member = { id: string; name: string; handle: string; role: Role | "partner"; status: "active" | "suspended"; joined: string };
 export const PLACES_INFO = places.map((p, i) => ({ id: p.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name: p, x: 12 + ((i * 37) % 76), y: 14 + ((i * 53) % 70) }));
 
-const initialReports: Report[] = [
-  { id: "r1", what: "Postcard · Night Market", by: "lena.hikes", reason: "Shows a stranger's face", status: "open" },
-  { id: "r2", what: "Chat message · Omar", by: "ana.bakes", reason: "Unkind language", status: "open" },
-  { id: "r3", what: "Postcard · Hill Lookout", by: "theo.pier", reason: "Location looks wrong", status: "open" },
-];
+const initialReports: Report[] = [];
 const initialOffers: Offer[] = [
   { id: "o1", place: "Riverside Cafe", partner: "Riverside Cafe", text: "Show your stamp for a free chai", status: "live" },
   { id: "o2", place: "Remparts Books", partner: "Remparts Books", text: "10% off any used atlas", status: "pending" },
   { id: "o3", place: "Corner Bakery", partner: "Corner Bakery", text: "Day-old loaf free after 5pm", status: "pending" },
 ];
-const initialMembers: Member[] = [
-  { id: "u1", name: "Sam Okafor", handle: "sam.okafor", role: "user", status: "active", joined: "OCT 02" },
-  { id: "u2", name: "Maya Lind", handle: "maya.walks", role: "user", status: "active", joined: "OCT 05" },
-  { id: "u3", name: "Jonas Berg", handle: "jonas.reads", role: "user", status: "active", joined: "OCT 11" },
-  { id: "u4", name: "Riverside Cafe", handle: "riverside", role: "partner", status: "active", joined: "OCT 14" },
-  { id: "u5", name: "Omar Haddad", handle: "omar.cycles", role: "user", status: "suspended", joined: "OCT 20" },
-  { id: "u6", name: "Ada Admin", handle: "ada.admin", role: "admin", status: "active", joined: "SEP 30" },
-];
+const initialMembers: Member[] = [];
 
 type Store = ReturnType<typeof useStoreState>;
 // Keep one context across hot reloads so a reloaded store module still finds the provider.
@@ -115,7 +84,7 @@ function useStoreState() {
   const [chats, setChats] = useState<Chat[]>(initialChats);
   const [coachLeft, setCoachLeft] = useState(3);
   const [demo, setDemo] = useState(false);
-  const [friends, setFriends] = useState<string[]>(["Maya", "Jonas", "Priya"]);
+  const [friends, setFriends] = useState<string[]>([]);
   const [dwell, setDwell] = useState(true);
   const [session, setSessionState] = useState<Session | null>(null);
   const [reports, setReports] = useState<Report[]>(initialReports);
@@ -175,6 +144,24 @@ function useStoreState() {
         setRack((existing) => [...liveCards, ...existing]);
       }
     }).catch(() => {});
+    // Fetch live registered members from Supabase profiles
+    Promise.resolve(
+      supabase.from("profiles").select("id, display_name, friend_code, created_at").limit(50)
+    ).then(({ data }: any) => {
+      if (data && data.length > 0) {
+        const liveMembers: Member[] = data.map((p: any) => ({
+          id: p.id,
+          name: p.display_name || "Member",
+          handle: p.friend_code ? p.friend_code.toLowerCase() : p.id.slice(0, 8),
+          role: "user" as Role,
+          status: "active" as const,
+          joined: p.created_at
+            ? new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }).toUpperCase()
+            : "TODAY",
+        }));
+        setMembers(liveMembers);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => { if (ready) { try { localStorage.setItem("os-demo", demo ? "1" : "0"); } catch {} } }, [demo, ready]);
@@ -186,11 +173,13 @@ function useStoreState() {
     try { s ? localStorage.setItem("os-session", JSON.stringify(s)) : localStorage.removeItem("os-session"); } catch {}
   };
 
-  const signIn = (email: string, role: Role, name?: string) => {
+  const signIn = (email: string, role: Role, name?: string, id?: string, friendCode?: string) => {
     setSession({
+      id: id || email,
       email,
       role,
-      name: name || (role === "admin" ? "Ada Admin" : "Sam Okafor"),
+      name: name || (role === "admin" ? "Admin" : email.split("@")[0]),
+      friendCode,
     });
   };
 
@@ -358,23 +347,34 @@ function useStoreState() {
     return chat;
   };
 
-  const startChat = (name: string) => {
+  const startChat = (name: string, peerId?: string, peerAvatar?: string, place = "Outdoors") => {
     const first = name.split(" ")[0] ?? name;
-    const id = first.toLowerCase().replace(/[^a-z0-9]+/g, "");
-    setChats((cs) =>
-      cs.some((c) => c.id === id)
-        ? cs
-        : [
-            {
-              id,
-              name: first,
-              place: "Somewhere nearby",
-              limit: MESSAGE_LIMIT_STEP,
-              messages: [{ id: `m_${Date.now()}`, mine: false, text: `Hi! It's ${first}. Fancy a walk sometime?` }],
-            },
-            ...cs,
-          ]
-    );
+    const id = peerId || first.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    setChats((cs) => {
+      const exists = cs.find((c) => c.id === id || (peerId && c.peerId === peerId));
+      if (exists) {
+        if ((peerId && !exists.peerId) || (peerAvatar && !exists.peerAvatar)) {
+          return cs.map((c) =>
+            c.id === exists.id
+              ? { ...c, peerId: peerId || c.peerId, peerAvatar: peerAvatar || c.peerAvatar }
+              : c
+          );
+        }
+        return cs;
+      }
+      return [
+        {
+          id,
+          peerId: peerId || id,
+          peerAvatar,
+          name: name,
+          place,
+          limit: MESSAGE_LIMIT_STEP,
+          messages: [],
+        },
+        ...cs,
+      ];
+    });
     return id;
   };
 
