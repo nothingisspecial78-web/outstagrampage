@@ -70,7 +70,8 @@ describe("App routing and components", () => {
 
     expect(getByText("Welcome Back")).toBeDefined();
     expect(getAllByText(/Explore as Guest/i).length).toBeGreaterThanOrEqual(1);
-    expect(getByText("Demo Member (Sam)")).toBeDefined();
+    expect(getByText("Member")).toBeDefined();
+    expect(getByText("Admin")).toBeDefined();
   });
 
   it("renders About manifesto page through router without errors", async () => {
