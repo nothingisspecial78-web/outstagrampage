@@ -348,10 +348,10 @@ function MyProfile() {
               </li>
             ))}
           </ul>
-          <div className="hidden sm:block"><Bio name={session?.name ?? ME.name} hours={hours} points={points} /></div>
+          <div className="hidden sm:block"><Bio name={session?.name ?? ME.name} bio={session?.bio} hours={hours} points={points} /></div>
         </div>
       </header>
-      <div className="mt-4 px-1 sm:hidden"><Bio name={session?.name ?? ME.name} hours={hours} points={points} /></div>
+      <div className="mt-4 px-1 sm:hidden"><Bio name={session?.name ?? ME.name} bio={session?.bio} hours={hours} points={points} /></div>
 
       {/* Highlights */}
       <div className="no-scrollbar mt-8 flex gap-6 overflow-x-auto px-1 sm:px-6">
@@ -843,7 +843,7 @@ function MyProfile() {
                                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-moss">
                                     <Check className="size-3" /> Stamped
                                   </span>
-                               ) : (
+                                ) : (
                                   <button
                                     onClick={() => simulateCheckin(place)}
                                     className="text-[10px] text-stamp-ink font-semibold hover:underline"
@@ -1162,13 +1162,13 @@ function MyProfile() {
   );
 }
 
-function Bio({ name, hours, points }: { name: string; hours: number; points: number }) {
+function Bio({ name, bio, hours, points }: { name: string; bio?: string; hours: number; points: number }) {
   return (
     <div className="space-y-1.5 text-sm">
       <p className="font-semibold text-ink">{name}</p>
-      <p className="text-ink">Walking more, scrolling less. Collecting stamps, not likes. 📍 Riverside</p>
+      <p className="text-ink">{bio || "Walking more, scrolling less. Collecting stamps, not likes. 📍 Riverside"}</p>
       <a className="flex items-center gap-1 font-semibold text-link hover:underline" href="#">
-        <Link2 className="size-3.5" />outstagram.app/sam
+        <Link2 className="size-3.5" />outstagram.app/{name.toLowerCase().replace(/\s+/g, "")}
       </a>
       <div className="flex flex-wrap gap-1.5 pt-1">
         <span className="inline-flex items-center gap-1 rounded-full bg-stamp px-2.5 py-1 text-xs font-bold text-primary-foreground">
