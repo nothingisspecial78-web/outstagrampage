@@ -68,22 +68,25 @@ export async function searchRealUsers(q: string, excludeId?: string): Promise<Pe
   try {
     let queryBuilder = supabase
       .from("profiles")
-      .select("id, display_name, friend_code, created_at")
+      .select("id, display_name, username, friend_code, created_at")
       .limit(40);
 
     if (query) {
-      queryBuilder = queryBuilder.or(`display_name.ilike.%${query}%,friend_code.ilike.%${query}%`);
+      queryBuilder = queryBuilder.or(`display_name.ilike.%${query}%,friend_code.ilike.%${query}%,username.ilike.%${query}%`);
     }
 
     const { data, error } = await queryBuilder;
     if (!error && data && data.length > 0) {
-      remoteProfiles = data.map((item: any) => ({
-        id: item.id,
-        name: item.display_name || "Member",
-        handle: item.friend_code ? item.friend_code.toLowerCase() : item.id.slice(0, 8),
-        friendCode: item.friend_code,
-        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(item.display_name || "User")}`,
-      }));
+      remoteProfiles = data.map((item: any) => {
+        const uName = item.username || item.display_name || "Member";
+        return {
+          id: item.id,
+          name: uName,
+          handle: (item.username || item.friend_code || item.display_name || item.id.slice(0, 8)).toLowerCase().replace(/\s+/g, ""),
+          friendCode: item.friend_code,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(uName)}`,
+        };
+      });
 
       remoteProfiles.forEach(saveRegisteredUser);
     }

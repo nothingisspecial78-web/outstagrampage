@@ -42,23 +42,25 @@ function Login() {
   const [busy, setBusy] = useState(false);
   const [busyText, setBusyText] = useState("Signing you in…");
   const [role, setRole] = useState<Role>("user");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [verificationSent, setVerificationSent] = useState<string | null>(null);
   const { signIn, demo, setDemo } = useStore();
   const nav = useNavigate();
 
   const enter = (mail: string, r: Role, n?: string, msg?: string, id?: string, friendCode?: string) => {
     const userId = id || mail;
     const displayName = n || (r === "admin" ? "Admin" : mail.split("@")[0]);
-    signIn(mail, r, displayName, userId, friendCode);
+    const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
+    signIn(mail, r, displayName, userId, friendCode, avatar);
     saveRegisteredUser({
       id: userId,
       name: displayName,
-      handle: friendCode ? friendCode.toLowerCase() : mail.split("@")[0],
+      handle: displayName.toLowerCase().replace(/\s+/g, ""),
       friendCode,
-      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+      avatar,
     });
     toast.success(msg ?? `Welcome${displayName ? `, ${displayName.split(" ")[0]}` : ""}!`);
     nav({ to: r === "admin" ? "/admin" : "/" });
@@ -90,7 +92,7 @@ function Login() {
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, display_name")
+          .select("role, display_name, username")
           .eq("id", authData.user.id)
           .maybeSingle();
 
@@ -100,8 +102,8 @@ function Login() {
           } else {
             userRole = "user";
           }
-          if (profile.display_name) {
-            displayName = profile.display_name;
+          if (profile.username || profile.display_name) {
+            displayName = profile.username || profile.display_name;
           }
         }
 
@@ -109,6 +111,7 @@ function Login() {
           userRole = "admin";
         }
 
+        setDemo(false);
         enter(targetEmail, userRole, displayName, `Signed in as ${displayName}`);
         return;
       }
@@ -122,15 +125,15 @@ function Login() {
       setBusy(false);
     }
 
+    setDemo(false);
     enter(targetEmail, fallbackRole, fallbackName, `Signed in as ${fallbackName}`);
   };
 
-  
   const handleGoogleSignIn = async () => {
     setBusyText("Opening Google Sign-In…");
     setBusy(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/`,
@@ -156,60 +159,78 @@ function Login() {
   };
 
   const submit = async () => {
-    const mail = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return setError("Enter a valid email address.");
-    if (password.length < 6) return setError("Password must be at least 6 characters.");
-    if (mode === "up" && !name.trim()) return setError("Please enter your name.");
     setError("");
 
-    const isSpecialAdmin =
-      mail.toLowerCase() === "nothingisspecial78@gmail.com" &&
-      password === "abdu@1027";
-
     if (mode === "in") {
+      const uInput = username.trim();
+      if (!uInput) return setError("Please enter your username.");
+      if (password.length < 6) return setError("Password must be at least 6 characters.");
+
       setBusyText("Signing you in…");
       setBusy(true);
 
       try {
+        let resolvedEmail: string | null = null;
+        const isSpecialAdmin =
+          uInput.toLowerCase() === "nothingisspecial78@gmail.com" &&
+          password === "abdu@1027";
+
+        if (uInput.includes("@")) {
+          resolvedEmail = uInput;
+        } else {
+          const { data: foundEmail, error: rpcError } = await supabase.rpc(
+            "get_email_for_username",
+            { p_username: uInput }
+          );
+          if (rpcError) {
+            console.warn("RPC get_email_for_username error:", rpcError);
+          }
+          resolvedEmail = foundEmail;
+        }
+
+        if (!resolvedEmail) {
+          setError(`No account found for username "${uInput}". Please check your username or sign up.`);
+          toast.error(`No account found for username "${uInput}".`);
+          setBusy(false);
+          return;
+        }
+
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: mail,
+          email: resolvedEmail,
           password: password,
         });
 
         if (authError) {
-          setError(authError.message);
+          setError(authError.message || "Invalid credentials. Please try again.");
           toast.error(authError.message || "Invalid credentials. Please try again.");
           setBusy(false);
           return;
         }
 
+        setDemo(false);
+
         let userRole: Role = isSpecialAdmin ? "admin" : (role === "admin" ? "admin" : "user");
-        let displayName = userRole === "admin" ? "Admin" : mail.split("@")[0];
-        let userId = authData?.user?.id || mail;
+        let displayName = uInput;
+        let userId = authData?.user?.id || resolvedEmail;
         let friendCode: string | undefined = undefined;
 
         if (authData?.user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("display_name, friend_code")
+            .select("display_name, username, friend_code, role")
             .eq("id", authData.user.id)
             .maybeSingle();
 
           if (profile) {
-            if (profile.display_name) {
-              displayName = profile.display_name;
-            }
-            if (profile.friend_code) {
-              friendCode = profile.friend_code;
+            displayName = profile.username || profile.display_name || uInput;
+            friendCode = profile.friend_code;
+            if (profile.role === "admin" || isSpecialAdmin) {
+              userRole = "admin";
             }
           }
         }
 
-        if (isSpecialAdmin) {
-          userRole = "admin";
-        }
-
-        enter(mail, userRole, displayName, `Welcome, ${displayName}!`, userId, friendCode);
+        enter(resolvedEmail, userRole, displayName, `Welcome, ${displayName}!`, userId, friendCode);
       } catch (err: any) {
         const msg = err?.message || "Failed to sign in. Please try again.";
         setError(msg);
@@ -219,17 +240,32 @@ function Login() {
       }
     } else {
       // mode === "up" (Sign Up)
+      const trimmedUsername = username.trim();
+      const mail = email.trim();
+
+      if (trimmedUsername.length < 3) {
+        return setError("Username must be at least 3 characters.");
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+        return setError("Please enter a valid email address.");
+      }
+      if (password.length < 6) {
+        return setError("Password must be at least 6 characters.");
+      }
+
       setBusyText("Creating your account…");
       setBusy(true);
 
       try {
-        const trimmedName = name.trim();
+        const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/` : "https://outstagrampage.vercel.app/";
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: mail,
           password: password,
           options: {
+            emailRedirectTo: redirectUrl,
             data: {
-              display_name: trimmedName,
+              display_name: trimmedUsername,
+              username: trimmedUsername.toLowerCase(),
               role: "user",
             },
           },
@@ -242,9 +278,11 @@ function Login() {
           return;
         }
 
+        setDemo(false);
+
         const user = authData?.user;
         const userRole: Role = "user";
-        const displayName = trimmedName;
+        const displayName = trimmedUsername;
         const userId = user?.id || `u_${Date.now()}`;
         const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -253,17 +291,19 @@ function Login() {
             await supabase.from("profiles").upsert({
               id: user.id,
               display_name: displayName,
+              username: displayName,
               friend_code: generatedCode,
             });
           } catch (pErr) {
             console.warn("Could not upsert profile:", pErr);
           }
+        }
 
-          if (!authData.session) {
-            try {
-              await supabase.auth.signInWithPassword({ email: mail, password });
-            } catch {}
-          }
+        if (!authData.session) {
+          setVerificationSent(mail);
+          toast.success("Verification link sent! Check your inbox to confirm your account.");
+          setBusy(false);
+          return;
         }
 
         enter(mail, userRole, displayName, "Account created — welcome!", userId, generatedCode);
@@ -306,8 +346,11 @@ function Login() {
                 aria-selected={role === r}
                 onClick={() => {
                   setRole(r);
+                  setError("");
+                  setVerificationSent(null);
                   if (r === "admin") {
                     setMode("in");
+                    setUsername("");
                     setEmail("");
                     setPassword("");
                   }
@@ -319,22 +362,96 @@ function Login() {
             ))}
           </div>
           {role === "admin" && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Sign in with authorized administrator credentials to review reports, approve partner offers, manage members and set daily quests.</p>}
-          <form className="mt-5 space-y-3.5" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
-            {mode === "up" && <Field icon={User}><input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className={inputCls} /></Field>}
-            <Field icon={Mail}><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={role === "admin" ? "Admin email" : "Email or phone"} className={inputCls} /></Field>
-            <Field icon={Lock}>
-              <input required type={show ? "text" : "password"} minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCls} />
-              <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"} className="text-ink-muted hover:text-ink">{show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
-            </Field>
-            {error && <p role="alert" className="rounded-xl bg-stamp-soft px-3 py-2 text-xs font-medium text-stamp-ink">{error}</p>}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-ink-muted"><Checkbox defaultChecked className="data-[state=checked]:border-stamp data-[state=checked]:bg-stamp" /> Keep me signed in</label>
-              <button type="button" className="font-semibold text-stamp-ink hover:underline">Forgot Password?</button>
+
+          {verificationSent ? (
+            <div className="mt-5 rounded-2xl border border-emerald-500/40 bg-paper-raised p-6 text-center shadow-paper">
+              <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 mb-3">
+                <Mail className="size-6" />
+              </div>
+              <h3 className="font-serif text-xl font-bold text-ink">Check your email</h3>
+              <p className="mt-2 text-sm text-ink-muted">
+                A confirmation link has been sent to <span className="font-semibold text-ink">{verificationSent}</span>.
+              </p>
+              <p className="mt-2 text-xs text-ink-muted">
+                Please click the link in your email to activate your account. You will be redirected right back to Outstagram!
+              </p>
+              <Button
+                type="button"
+                onClick={() => {
+                  setVerificationSent(null);
+                  setMode("in");
+                }}
+                className="mt-5 w-full rounded-2xl py-3 text-sm font-bold shadow-postcard"
+              >
+                Back to Sign In
+              </Button>
             </div>
-            <Button type="submit" disabled={busy} className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5">
-              {busy ? "Please wait…" : role === "admin" ? "Login as Admin" : mode === "in" ? "Login" : "Get Started"}
-            </Button>
-          </form>
+          ) : (
+            <form className="mt-5 space-y-3.5" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
+              {mode === "up" ? (
+                <>
+                  <Field icon={User}>
+                    <input
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Username"
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field icon={Mail}>
+                    <input
+                      required
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email address"
+                      className={inputCls}
+                    />
+                  </Field>
+                </>
+              ) : (
+                <Field icon={User}>
+                  <input
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder={role === "admin" ? "Admin username or email" : "Username"}
+                    className={inputCls}
+                  />
+                </Field>
+              )}
+              <Field icon={Lock}>
+                <input
+                  required
+                  type={show ? "text" : "password"}
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className={inputCls}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShow((s) => !s)}
+                  aria-label={show ? "Hide password" : "Show password"}
+                  className="text-ink-muted hover:text-ink"
+                >
+                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </Field>
+              {error && <p role="alert" className="rounded-xl bg-stamp-soft px-3 py-2 text-xs font-medium text-stamp-ink">{error}</p>}
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center gap-2 text-ink-muted">
+                  <Checkbox defaultChecked className="data-[state=checked]:border-stamp data-[state=checked]:bg-stamp" /> Keep me signed in
+                </label>
+                <button type="button" className="font-semibold text-stamp-ink hover:underline">Forgot Password?</button>
+              </div>
+              <Button type="submit" disabled={busy} className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5">
+                {busy ? "Please wait…" : role === "admin" ? "Login as Admin" : mode === "in" ? "Login" : "Get Started"}
+              </Button>
+            </form>
+          )}
 
           <div className="my-6 flex items-center gap-3 text-xs text-ink-muted"><span className="h-px flex-1 bg-sand" />or continue with<span className="h-px flex-1 bg-sand" /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -364,9 +481,27 @@ function Login() {
           </div>
           {role === "user" && <p className="mt-6 text-center text-sm text-ink-muted">
             {mode === "in" ? "Don't have an account? " : "Already have an account? "}
-            <button onClick={() => setMode(mode === "in" ? "up" : "in")} className="font-bold text-ink hover:text-stamp-ink">{mode === "in" ? "Sign Up" : "Sign In"}</button>
+            <button
+              onClick={() => {
+                setMode(mode === "in" ? "up" : "in");
+                setError("");
+                setVerificationSent(null);
+              }}
+              className="font-bold text-ink hover:text-stamp-ink"
+            >
+              {mode === "in" ? "Sign Up" : "Sign In"}
+            </button>
           </p>}
-          <button type="button" onClick={() => enter("guest@outstagram.app", "user", "Guest", "Exploring as guest")} className="mx-auto mt-4 flex items-center justify-center gap-1 text-sm font-semibold text-stamp-ink">Explore as Guest <ArrowRight className="size-4" /></button>
+          <button
+            type="button"
+            onClick={() => {
+              setDemo(true);
+              enter("guest@outstagram.app", "user", "Guest", "Exploring as guest");
+            }}
+            className="mx-auto mt-4 flex items-center justify-center gap-1 text-sm font-semibold text-stamp-ink"
+          >
+            Explore as Guest <ArrowRight className="size-4" />
+          </button>
         </div>
       </div>
 

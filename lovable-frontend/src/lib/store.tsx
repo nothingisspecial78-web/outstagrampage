@@ -51,7 +51,7 @@ const initialStamps: Stamp[] = [];
 const initialCrafts: Craft[] = [];
 
 export type Role = "user" | "admin";
-export type Session = { id?: string; name: string; email: string; role: Role; friendCode?: string };
+export type Session = { id?: string; name: string; email: string; role: Role; friendCode?: string; avatar?: string };
 export type Report = { id: string; what: string; by: string; reason: string; status: "open" | "kept" | "removed" };
 export type Offer = { id: string; place: string; partner: string; text: string; status: "pending" | "live" | "rejected" };
 export type Member = { id: string; name: string; handle: string; role: Role | "partner"; status: "active" | "suspended"; joined: string };
@@ -112,6 +112,39 @@ function useStoreState() {
     } catch {}
     setReady(true);
 
+    // Supabase auth state subscriber (handles OAuth, email verification redirects with hash, session recovery)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, authSession) => {
+      if (authSession?.user) {
+        const u = authSession.user;
+        let displayName = u.user_metadata?.display_name || u.user_metadata?.username || u.email?.split("@")[0] || "Member";
+        let userRole: Role = u.email === "nothingisspecial78@gmail.com" ? "admin" : "user";
+        let friendCode: string | undefined = undefined;
+
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("id, display_name, friend_code, role")
+            .eq("id", u.id)
+            .maybeSingle();
+
+          if (profile) {
+            if (profile.display_name) displayName = profile.display_name;
+            if (profile.friend_code) friendCode = profile.friend_code;
+            if (profile.role === "admin" || u.email === "nothingisspecial78@gmail.com") userRole = "admin";
+          }
+        } catch {}
+
+        setSessionState({
+          id: u.id,
+          email: u.email || `${displayName}@user`,
+          name: displayName,
+          role: userRole,
+          friendCode,
+          avatar: u.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+        });
+      }
+    });
+
     // Initial background sync with Supabase tables
     Promise.all([fetchLiveQuests(), fetchLivePlaces(), fetchLiveOffers()]).then(([q, p, o]) => {
       if (o && o.length > 0) {
@@ -144,6 +177,7 @@ function useStoreState() {
         setRack((existing) => [...liveCards, ...existing]);
       }
     }).catch(() => {});
+
     // Fetch live registered members from Supabase profiles
     Promise.resolve(
       supabase.from("profiles").select("id, display_name, friend_code, created_at").limit(50)
@@ -162,7 +196,90 @@ function useStoreState() {
         setMembers(liveMembers);
       }
     }).catch(() => {});
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
+
+  // Listen for real-time incoming chat messages across users
+  useEffect(() => {
+    const rawIds = [
+      session?.id,
+      session?.email,
+      session?.friendCode,
+      session?.name,
+    ].filter(Boolean) as string[];
+
+    if (rawIds.length === 0) return;
+
+    const uniqueClean = Array.from(
+      new Set(rawIds.map((id) => id.replace(/[^a-zA-Z0-9_-]/g, "_")))
+    );
+
+    const channels = uniqueClean.map((cleanId) => {
+      const channelName = `user_chat_${cleanId}`;
+      const ch = supabase.channel(channelName, {
+        config: { broadcast: { self: false } },
+      });
+
+      ch.on("broadcast", { event: "new_chat_msg" }, ({ payload }: any) => {
+        if (!payload || !payload.senderId) return;
+        if (payload.senderId === session?.id || payload.senderId === session?.email) return;
+
+        const incomingMsg: Msg = {
+          id: payload.msgId || `m_in_${Date.now()}`,
+          mine: false,
+          text: payload.text || "",
+          audioUrl: payload.audioUrl,
+          audioDuration: payload.audioDuration,
+          postcard: payload.postcard,
+        };
+
+        const peerChatId = payload.chatId || payload.senderId;
+        const peerName = payload.senderName || "Friend";
+
+        setChats((prev) => {
+          const existing = prev.find(
+            (c) => c.id === peerChatId || c.peerId === payload.senderId || c.name.toLowerCase() === peerName.toLowerCase()
+          );
+          if (existing) {
+            return prev.map((c) =>
+              c.id === existing.id
+                ? {
+                    ...c,
+                    messages: [...c.messages, incomingMsg],
+                    peerAvatar: payload.senderAvatar || c.peerAvatar,
+                  }
+                : c
+            );
+          } else {
+            const newChat: Chat = {
+              id: peerChatId,
+              peerId: payload.senderId,
+              peerAvatar: payload.senderAvatar,
+              name: peerName,
+              place: "Nearby",
+              limit: MESSAGE_LIMIT_STEP,
+              messages: [incomingMsg],
+            };
+            return [newChat, ...prev];
+          }
+        });
+      });
+
+      ch.subscribe();
+      return ch;
+    });
+
+    return () => {
+      channels.forEach((ch) => {
+        try {
+          supabase.removeChannel(ch);
+        } catch {}
+      });
+    };
+  }, [session?.id, session?.email, session?.friendCode, session?.name]);
 
   useEffect(() => { if (ready) { try { localStorage.setItem("os-demo", demo ? "1" : "0"); } catch {} } }, [demo, ready]);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-chats", JSON.stringify(chats)); } catch {} } }, [chats, ready]);
@@ -173,13 +290,14 @@ function useStoreState() {
     try { s ? localStorage.setItem("os-session", JSON.stringify(s)) : localStorage.removeItem("os-session"); } catch {}
   };
 
-  const signIn = (email: string, role: Role, name?: string, id?: string, friendCode?: string) => {
+  const signIn = (email: string, role: Role, name?: string, id?: string, friendCode?: string, avatar?: string) => {
     setSession({
       id: id || email,
       email,
       role,
       name: name || (role === "admin" ? "Admin" : email.split("@")[0]),
       friendCode,
+      avatar,
     });
   };
 
@@ -229,13 +347,39 @@ function useStoreState() {
   };
 
   const sendMsg = (chatId: string, text: string) => {
+    const msgId = `m_${Date.now()}`;
     setChats((cs) =>
       cs.map((c) =>
         c.id === chatId
-          ? { ...c, messages: [...c.messages, { id: `m_${Date.now()}`, mine: true, text }] }
+          ? { ...c, messages: [...c.messages, { id: msgId, mine: true, text }] }
           : c
       )
     );
+
+    const targetChat = chats.find((c) => c.id === chatId);
+    const targetPeerId = (targetChat?.peerId || chatId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    try {
+      const ch = supabase.channel(`user_chat_${targetPeerId}`, { config: { broadcast: { self: false } } });
+      ch.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await ch.send({
+            type: "broadcast",
+            event: "new_chat_msg",
+            payload: {
+              chatId,
+              msgId,
+              senderId: session?.id || session?.email || "self",
+              senderName: session?.name || "Friend",
+              senderAvatar: session?.avatar,
+              text,
+            },
+          });
+          setTimeout(() => {
+            try { supabase.removeChannel(ch); } catch {}
+          }, 1000);
+        }
+      });
+    } catch {}
   };
 
   const send = (chatId: string, text: string) => {
@@ -243,6 +387,7 @@ function useStoreState() {
   };
 
   const sendVoice = (chatId: string, audioUrl: string, duration: number) => {
+    const msgId = `m_voice_${Date.now()}`;
     setChats((cs) =>
       cs.map((c) =>
         c.id === chatId
@@ -251,7 +396,7 @@ function useStoreState() {
               messages: [
                 ...c.messages,
                 {
-                  id: `m_voice_${Date.now()}`,
+                  id: msgId,
                   mine: true,
                   text: "Voice message",
                   audioUrl,
@@ -262,6 +407,33 @@ function useStoreState() {
           : c
       )
     );
+
+    const targetChat = chats.find((c) => c.id === chatId);
+    const targetPeerId = (targetChat?.peerId || chatId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    try {
+      const ch = supabase.channel(`user_chat_${targetPeerId}`, { config: { broadcast: { self: false } } });
+      ch.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await ch.send({
+            type: "broadcast",
+            event: "new_chat_msg",
+            payload: {
+              chatId,
+              msgId,
+              senderId: session?.id || session?.email || "self",
+              senderName: session?.name || "Friend",
+              senderAvatar: session?.avatar,
+              text,
+              audioUrl,
+              audioDuration: duration,
+            },
+          });
+          setTimeout(() => {
+            try { supabase.removeChannel(ch); } catch {}
+          }, 1000);
+        }
+      });
+    } catch {}
   };
 
   const logCallEvent = (
@@ -417,7 +589,7 @@ function useStoreState() {
   const removeQuest = (q: string) => setQuests((prev) => prev.filter((x) => x !== q));
 
   return {
-    hours, questDone, seen, rack, stamps, crafts, chats, coachLeft, demo, session, ready,
+    hours, questDone, seen, rack: demo ? [...rack, ...DEMO_RACK] : rack, stamps, crafts, chats, coachLeft, demo, session, ready,
     reports, offers, members, quests,
     friends, setFriends, addFriend, addFriendName,
     dwell, setDwell, setDemo,
