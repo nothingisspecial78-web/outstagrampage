@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles } from "lucide-react";
+import { useState, useRef } from "react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles, Camera, Upload, CheckCircle2, RotateCw, FileText } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { saveRegisteredUser } from "@/lib/people";
@@ -45,22 +45,58 @@ function Login() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatar, setAvatar] = useState("");
+  const [otpMode, setOtpMode] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpBusy, setOtpBusy] = useState(false);
   const [error, setError] = useState("");
-  const [verificationSent, setVerificationSent] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const { signIn, demo, setDemo } = useStore();
   const nav = useNavigate();
 
-  const enter = (mail: string, r: Role, n?: string, msg?: string, id?: string, friendCode?: string) => {
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image too large. Please select a photo under 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === "string") {
+        setAvatar(event.target.result);
+        toast.success("Profile photo uploaded!");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const previewAvatar = avatar || (username.trim()
+    ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username.trim())}`
+    : "https://api.dicebear.com/7.x/initials/svg?seed=Outstagram");
+
+  const enter = (
+    mail: string,
+    r: Role,
+    n?: string,
+    msg?: string,
+    id?: string,
+    friendCode?: string,
+    avatarSrc?: string,
+    bioText?: string
+  ) => {
     const userId = id || mail;
     const displayName = n || (r === "admin" ? "Admin" : mail.split("@")[0]);
-    const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
-    signIn(mail, r, displayName, userId, friendCode, avatar);
+    const finalAvatar = avatarSrc || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
+    signIn(mail, r, displayName, userId, friendCode, finalAvatar, bioText);
     saveRegisteredUser({
       id: userId,
       name: displayName,
       handle: displayName.toLowerCase().replace(/\s+/g, ""),
       friendCode,
-      avatar,
+      avatar: finalAvatar,
+      bio: bioText,
     });
     toast.success(msg ?? `Welcome${displayName ? `, ${displayName.split(" ")[0]}` : ""}!`);
     nav({ to: r === "admin" ? "/admin" : "/" });
@@ -89,10 +125,12 @@ function Login() {
       if (!authError && authData.user) {
         let userRole: Role = isSpecialAdmin ? "admin" : fallbackRole;
         let displayName = fallbackName;
+        let profileAvatar: string | undefined;
+        let profileBio: string | undefined;
 
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, display_name, username")
+          .select("role, display_name, username, avatar_url, bio")
           .eq("id", authData.user.id)
           .maybeSingle();
 
@@ -105,6 +143,8 @@ function Login() {
           if (profile.username || profile.display_name) {
             displayName = profile.username || profile.display_name;
           }
+          profileAvatar = profile.avatar_url;
+          profileBio = profile.bio;
         }
 
         if (isSpecialAdmin) {
@@ -112,7 +152,7 @@ function Login() {
         }
 
         setDemo(false);
-        enter(targetEmail, userRole, displayName, `Signed in as ${displayName}`);
+        enter(targetEmail, userRole, displayName, `Signed in as ${displayName}`, authData.user.id, undefined, profileAvatar, profileBio);
         return;
       }
 
@@ -213,24 +253,28 @@ function Login() {
         let displayName = uInput;
         let userId = authData?.user?.id || resolvedEmail;
         let friendCode: string | undefined = undefined;
+        let profileAvatar: string | undefined;
+        let profileBio: string | undefined;
 
         if (authData?.user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("display_name, username, friend_code, role")
+            .select("display_name, username, friend_code, role, avatar_url, bio")
             .eq("id", authData.user.id)
             .maybeSingle();
 
           if (profile) {
             displayName = profile.username || profile.display_name || uInput;
             friendCode = profile.friend_code;
+            profileAvatar = profile.avatar_url;
+            profileBio = profile.bio;
             if (profile.role === "admin" || isSpecialAdmin) {
               userRole = "admin";
             }
           }
         }
 
-        enter(resolvedEmail, userRole, displayName, `Welcome, ${displayName}!`, userId, friendCode);
+        enter(resolvedEmail, userRole, displayName, `Welcome, ${displayName}!`, userId, friendCode, profileAvatar, profileBio);
       } catch (err: any) {
         const msg = err?.message || "Failed to sign in. Please try again.";
         setError(msg);
@@ -246,6 +290,9 @@ function Login() {
       if (trimmedUsername.length < 3) {
         return setError("Username must be at least 3 characters.");
       }
+      if (!/^[a-zA-Z0-9_.]+$/.test(trimmedUsername)) {
+        return setError("Username can only contain letters, numbers, underscores, and dots.");
+      }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
         return setError("Please enter a valid email address.");
       }
@@ -253,11 +300,31 @@ function Login() {
         return setError("Password must be at least 6 characters.");
       }
 
-      setBusyText("Creating your account…");
+      setBusyText("Verifying username availability…");
       setBusy(true);
 
       try {
+        // 1. Check if username is already taken in database
+        const { data: isAvailable, error: checkErr } = await supabase.rpc(
+          "check_username_available",
+          { p_username: trimmedUsername }
+        );
+
+        if (checkErr) {
+          console.warn("Could not check username:", checkErr);
+        } else if (isAvailable === false) {
+          setError(`Username "${trimmedUsername}" is already taken. Please choose another username.`);
+          toast.error(`Username "${trimmedUsername}" is already taken.`);
+          setBusy(false);
+          return;
+        }
+
+        setBusyText("Creating your Outstagram account…");
+
         const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/` : "https://outstagrampage.vercel.app/";
+        const finalAvatar = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(trimmedUsername)}`;
+        const finalBio = bio.trim() || "Living offline first. Exploring the city with Outstagram.";
+
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: mail,
           password: password,
@@ -266,6 +333,8 @@ function Login() {
             data: {
               display_name: trimmedUsername,
               username: trimmedUsername.toLowerCase(),
+              avatar_url: finalAvatar,
+              bio: finalBio,
               role: "user",
             },
           },
@@ -292,6 +361,8 @@ function Login() {
               id: user.id,
               display_name: displayName,
               username: displayName,
+              avatar_url: finalAvatar,
+              bio: finalBio,
               friend_code: generatedCode,
             });
           } catch (pErr) {
@@ -300,13 +371,14 @@ function Login() {
         }
 
         if (!authData.session) {
-          setVerificationSent(mail);
-          toast.success("Verification link sent! Check your inbox to confirm your account.");
+          // Switch to OTP Verification Screen
+          setOtpMode(true);
+          toast.success("Confirmation code sent to your email!");
           setBusy(false);
           return;
         }
 
-        enter(mail, userRole, displayName, "Account created — welcome!", userId, generatedCode);
+        enter(mail, userRole, displayName, "Account created — welcome!", userId, generatedCode, finalAvatar, finalBio);
       } catch (err: any) {
         const msg = err?.message || "An unexpected error occurred during signup.";
         setError(msg);
@@ -314,6 +386,100 @@ function Login() {
       } finally {
         setBusy(false);
       }
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = otp.trim();
+    if (token.length < 6) {
+      setError("Please enter the complete 6-digit confirmation code.");
+      return;
+    }
+    setError("");
+    setOtpBusy(true);
+
+    try {
+      // 1. Attempt verification with type 'signup'
+      let { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token,
+        type: "signup",
+      });
+
+      // 2. If signup type fails, fallback to 'email' type
+      if (verifyErr) {
+        const fallback = await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token,
+          type: "email",
+        });
+        if (!fallback.error && fallback.data.user) {
+          verifyData = fallback.data;
+          verifyErr = null;
+        }
+      }
+
+      if (verifyErr) {
+        setError(verifyErr.message || "Invalid or expired confirmation code. Please check your email or click Resend.");
+        toast.error(verifyErr.message || "Invalid confirmation code.");
+        setOtpBusy(false);
+        return;
+      }
+
+      // Successful verification!
+      const user = verifyData?.user || (await supabase.auth.getUser()).data.user;
+      const finalAvatar = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username.trim())}`;
+      const finalBio = bio.trim() || "Living offline first. Exploring the city with Outstagram.";
+      const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      if (user) {
+        try {
+          await supabase.rpc("update_user_profile", {
+            p_user_id: user.id,
+            p_username: username.trim(),
+            p_display_name: username.trim(),
+            p_avatar_url: finalAvatar,
+            p_bio: finalBio,
+          });
+        } catch (uErr) {
+          console.warn("Profile update RPC error:", uErr);
+        }
+      }
+
+      setDemo(false);
+      toast.success("Email verified! Welcome to Outstagram.");
+      enter(
+        email.trim(),
+        "user",
+        username.trim(),
+        "Account verified — welcome to Outstagram!",
+        user?.id,
+        generatedCode,
+        finalAvatar,
+        finalBio
+      );
+    } catch (err: any) {
+      setError(err?.message || "Failed to verify code.");
+      toast.error(err?.message || "Failed to verify code.");
+    } finally {
+      setOtpBusy(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    try {
+      const { error: resendErr } = await supabase.auth.resend({
+        type: "signup",
+        email: email.trim(),
+      });
+      if (resendErr) {
+        toast.error(resendErr.message || "Failed to resend code.");
+      } else {
+        toast.success("New 6-digit confirmation code sent to " + email.trim());
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Could not resend code.");
     }
   };
 
@@ -334,71 +500,173 @@ function Login() {
         <Postmark place="Go outside" date="TODAY" className="absolute top-36 right-6 size-24 rounded-full bg-paper-raised/90 lg:hidden" />
         <div className="relative">
           <Wordmark className="relative text-3xl lg:hidden [&_*]:text-paper-raised" />
-          <h1 className="mt-40 font-serif text-3xl font-semibold text-ink lg:mt-0 lg:text-4xl">{mode === "in" ? "Welcome Back" : "Get Started"}</h1>
-          <p className="mt-1.5 text-sm text-ink-muted">{mode === "in" ? "Sign in. One quest, ten postcards, then go outside." : "Create an account. No likes, no followers."}</p>
+          <h1 className="mt-40 font-serif text-3xl font-semibold text-ink lg:mt-0 lg:text-4xl">
+            {otpMode ? "Verify Your Account" : mode === "in" ? "Welcome Back" : "Get Started"}
+          </h1>
+          <p className="mt-1.5 text-sm text-ink-muted">
+            {otpMode
+              ? `Enter the 6-digit confirmation code (OTP) sent to your email.`
+              : mode === "in"
+              ? "Sign in. One quest, ten postcards, then go outside."
+              : "Create an account. No likes, no followers."}
+          </p>
 
-          <div role="tablist" aria-label="Account type" className="mt-6 grid grid-cols-2 rounded-2xl border border-sand bg-paper p-1">
-            {(["user", "admin"] as const).map((r) => (
-              <button
-                key={r}
-                role="tab"
-                type="button"
-                aria-selected={role === r}
-                onClick={() => {
-                  setRole(r);
-                  setError("");
-                  setVerificationSent(null);
-                  if (r === "admin") {
-                    setMode("in");
-                    setUsername("");
-                    setEmail("");
-                    setPassword("");
-                  }
-                }}
-                className={cn("flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all", role === r ? "bg-paper-raised text-ink shadow-paper" : "text-ink-muted hover:text-ink")}
-              >
-                {r === "admin" ? <ShieldCheck className="size-4" /> : <User className="size-4" />}{r === "admin" ? "Admin" : "Member"}
-              </button>
-            ))}
-          </div>
-          {role === "admin" && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Sign in with authorized administrator credentials to review reports, approve partner offers, manage members and set daily quests.</p>}
+          {!otpMode && (
+            <div role="tablist" aria-label="Account type" className="mt-6 grid grid-cols-2 rounded-2xl border border-sand bg-paper p-1">
+              {(["user", "admin"] as const).map((r) => (
+                <button
+                  key={r}
+                  role="tab"
+                  type="button"
+                  aria-selected={role === r}
+                  onClick={() => {
+                    setRole(r);
+                    setError("");
+                    setOtpMode(false);
+                    if (r === "admin") {
+                      setMode("in");
+                      setUsername("");
+                      setEmail("");
+                      setPassword("");
+                    }
+                  }}
+                  className={cn("flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all", role === r ? "bg-paper-raised text-ink shadow-paper" : "text-ink-muted hover:text-ink")}
+                >
+                  {r === "admin" ? <ShieldCheck className="size-4" /> : <User className="size-4" />}{r === "admin" ? "Admin" : "Member"}
+                </button>
+              ))}
+            </div>
+          )}
+          {role === "admin" && !otpMode && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Sign in with authorized administrator credentials to review reports, approve partner offers, manage members and set daily quests.</p>}
 
-          {verificationSent ? (
-            <div className="mt-5 rounded-2xl border border-emerald-500/40 bg-paper-raised p-6 text-center shadow-paper">
+          {otpMode ? (
+            /* OTP VERIFICATION VIEW */
+            <div className="mt-6 rounded-2xl border border-emerald-500/40 bg-paper-raised p-6 shadow-paper">
               <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 mb-3">
-                <Mail className="size-6" />
+                <CheckCircle2 className="size-6" />
               </div>
-              <h3 className="font-serif text-xl font-bold text-ink">Check your email</h3>
-              <p className="mt-2 text-sm text-ink-muted">
-                A confirmation link has been sent to <span className="font-semibold text-ink">{verificationSent}</span>.
+              <h3 className="font-serif text-xl font-bold text-ink text-center">Enter Confirmation Code</h3>
+              <p className="mt-2 text-xs text-ink-muted text-center">
+                We've sent a 6-digit confirmation code (OTP) to <span className="font-semibold text-ink">{email}</span>.
               </p>
-              <p className="mt-2 text-xs text-ink-muted">
-                Please click the link in your email to activate your account. You will be redirected right back to Outstagram!
-              </p>
-              <Button
-                type="button"
-                onClick={() => {
-                  setVerificationSent(null);
-                  setMode("in");
-                }}
-                className="mt-5 w-full rounded-2xl py-3 text-sm font-bold shadow-postcard"
-              >
-                Back to Sign In
-              </Button>
+
+              <form onSubmit={handleVerifyOtp} className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5 text-center">6-Digit Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoFocus
+                    required
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="123456"
+                    className="h-14 w-full rounded-2xl border border-sand bg-paper text-center text-3xl font-mono font-bold tracking-[0.4em] text-ink outline-none focus:border-stamp focus:shadow-[0_0_0_4px_var(--stamp-soft)]"
+                  />
+                </div>
+
+                {error && <p role="alert" className="rounded-xl bg-stamp-soft px-3 py-2 text-xs font-medium text-stamp-ink text-center">{error}</p>}
+
+                <Button
+                  type="submit"
+                  disabled={otpBusy || otp.length < 6}
+                  className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5"
+                >
+                  {otpBusy ? "Verifying code…" : "Verify & Complete Sign Up"}
+                </Button>
+
+                <div className="flex items-center justify-between pt-2 text-xs text-ink-muted">
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    className="font-semibold text-stamp-ink hover:underline"
+                  >
+                    Resend Code
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpMode(false);
+                      setError("");
+                    }}
+                    className="hover:underline"
+                  >
+                    Edit Email / Back
+                  </button>
+                </div>
+
+                <p className="text-center text-[11px] text-ink-muted/80 pt-2 border-t border-sand/50">
+                  Tip: You can also click the confirmation link in the email to activate your account directly.
+                </p>
+              </form>
             </div>
           ) : (
+            /* NORMAL LOGIN / SIGNUP FORM */
             <form className="mt-5 space-y-3.5" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
-              {mode === "up" ? (
+              {mode === "up" && (
                 <>
+                  {/* Avatar Picker & Upload */}
+                  <div className="flex items-center gap-4 rounded-2xl border border-sand bg-paper p-3">
+                    <div className="relative group shrink-0">
+                      <img
+                        src={previewAvatar}
+                        alt="Avatar preview"
+                        className="size-16 rounded-full border-2 border-stamp/40 object-cover bg-sand/20 shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        className="absolute inset-0 flex items-center justify-center rounded-full bg-ink/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Upload photo"
+                      >
+                        <Camera className="size-5" />
+                      </button>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-ink">Profile Photo</p>
+                      <p className="text-[11px] text-ink-muted">Upload your picture or use default initials.</p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          className="inline-flex items-center gap-1 rounded-lg border border-sand bg-paper-raised px-2.5 py-1 text-xs font-semibold text-ink hover:bg-sand/30"
+                        >
+                          <Upload className="size-3" /> Upload Photo
+                        </button>
+                        {avatar && (
+                          <button
+                            type="button"
+                            onClick={() => setAvatar("")}
+                            className="text-[11px] text-ink-muted hover:text-stamp-ink"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarFile}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Username Field */}
                   <Field icon={User}>
                     <input
                       required
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Username"
+                      placeholder="Username (e.g. alex24)"
                       className={inputCls}
                     />
                   </Field>
+
+                  {/* Email Field */}
                   <Field icon={Mail}>
                     <input
                       required
@@ -410,7 +678,9 @@ function Login() {
                     />
                   </Field>
                 </>
-              ) : (
+              )}
+
+              {mode === "in" && (
                 <Field icon={User}>
                   <input
                     required
@@ -421,6 +691,8 @@ function Login() {
                   />
                 </Field>
               )}
+
+              {/* Password Field */}
               <Field icon={Lock}>
                 <input
                   required
@@ -440,68 +712,92 @@ function Login() {
                   {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </Field>
+
+              {/* Bio Field (Only in Sign Up) */}
+              {mode === "up" && (
+                <Field icon={FileText}>
+                  <input
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Short bio (e.g. Walking more, scrolling less)"
+                    maxLength={120}
+                    className={inputCls}
+                  />
+                </Field>
+              )}
+
               {error && <p role="alert" className="rounded-xl bg-stamp-soft px-3 py-2 text-xs font-medium text-stamp-ink">{error}</p>}
+
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 text-ink-muted">
                   <Checkbox defaultChecked className="data-[state=checked]:border-stamp data-[state=checked]:bg-stamp" /> Keep me signed in
                 </label>
                 <button type="button" className="font-semibold text-stamp-ink hover:underline">Forgot Password?</button>
               </div>
+
               <Button type="submit" disabled={busy} className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5">
-                {busy ? "Please wait…" : role === "admin" ? "Login as Admin" : mode === "in" ? "Login" : "Get Started"}
+                {busy ? "Please wait…" : role === "admin" ? "Login as Admin" : mode === "in" ? "Login" : "Create Account"}
               </Button>
             </form>
           )}
 
-          <div className="my-6 flex items-center gap-3 text-xs text-ink-muted"><span className="h-px flex-1 bg-sand" />or continue with<span className="h-px flex-1 bg-sand" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised py-3 text-sm font-semibold text-ink transition-all hover:-translate-y-0.5 hover:shadow-paper cursor-pointer"
-            >
-              <svg className="size-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-              </svg>
-              <span>Google</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => toast.info("Apple Sign-In is configured via WebKit")}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised py-3 text-sm font-semibold text-ink transition-all hover:-translate-y-0.5 hover:shadow-paper cursor-pointer"
-            >
-              <svg className="size-4 fill-ink" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.58.67-.99 1.74-.85 2.78 1.01.08 2.06-.53 2.58-1.28z" />
-              </svg>
-              <span>Apple</span>
-            </button>
-          </div>
-          {role === "user" && <p className="mt-6 text-center text-sm text-ink-muted">
-            {mode === "in" ? "Don't have an account? " : "Already have an account? "}
-            <button
-              onClick={() => {
-                setMode(mode === "in" ? "up" : "in");
-                setError("");
-                setVerificationSent(null);
-              }}
-              className="font-bold text-ink hover:text-stamp-ink"
-            >
-              {mode === "in" ? "Sign Up" : "Sign In"}
-            </button>
-          </p>}
-          <button
-            type="button"
-            onClick={() => {
-              setDemo(true);
-              enter("guest@outstagram.app", "user", "Guest", "Exploring as guest");
-            }}
-            className="mx-auto mt-4 flex items-center justify-center gap-1 text-sm font-semibold text-stamp-ink"
-          >
-            Explore as Guest <ArrowRight className="size-4" />
-          </button>
+          {!otpMode && (
+            <>
+              <div className="my-6 flex items-center gap-3 text-xs text-ink-muted"><span className="h-px flex-1 bg-sand" />or continue with<span className="h-px flex-1 bg-sand" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised py-3 text-sm font-semibold text-ink transition-all hover:-translate-y-0.5 hover:shadow-paper cursor-pointer"
+                >
+                  <svg className="size-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Google</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toast.info("Apple Sign-In is configured via WebKit")}
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised py-3 text-sm font-semibold text-ink transition-all hover:-translate-y-0.5 hover:shadow-paper cursor-pointer"
+                >
+                  <svg className="size-4 fill-ink" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.58.67-.99 1.74-.85 2.78 1.01.08 2.06-.53 2.58-1.28z" />
+                  </svg>
+                  <span>Apple</span>
+                </button>
+              </div>
+
+              {role === "user" && (
+                <p className="mt-6 text-center text-sm text-ink-muted">
+                  {mode === "in" ? "Don't have an account? " : "Already have an account? "}
+                  <button
+                    onClick={() => {
+                      setMode(mode === "in" ? "up" : "in");
+                      setError("");
+                      setOtpMode(false);
+                    }}
+                    className="font-bold text-ink hover:text-stamp-ink"
+                  >
+                    {mode === "in" ? "Sign Up" : "Sign In"}
+                  </button>
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDemo(true);
+                  enter("guest@outstagram.app", "user", "Guest", "Exploring as guest");
+                }}
+                className="mx-auto mt-4 flex items-center justify-center gap-1 text-sm font-semibold text-stamp-ink"
+              >
+                Explore as Guest <ArrowRight className="size-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

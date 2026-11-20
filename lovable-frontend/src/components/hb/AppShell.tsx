@@ -58,7 +58,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <span className={cn("hidden xl:inline", collapsed && "xl:hidden")}>{label}</span>
     </span>
   );
-  const badge = <span className="absolute -top-1.5 -right-1.5 grid size-[18px] place-items-center rounded-full bg-badge text-[11px] font-bold text-primary-foreground ring-2 ring-paper-raised">{unread}</span>;
+  const badge = unread > 0 ? (
+    <span className="absolute -top-1.5 -right-1.5 grid size-[18px] place-items-center rounded-full bg-badge text-[11px] font-bold text-primary-foreground ring-2 ring-paper-raised">
+      {unread}
+    </span>
+  ) : null;
   const dot = !seenNotes && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-badge ring-2 ring-paper-raised" />;
 
   return (
@@ -178,7 +182,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <Send className="size-5 text-stamp-ink" />
                     <span className="flex items-center gap-2">
-                      Chats <span className="rounded-full bg-badge px-1.5 py-0.2 text-[10px] font-bold text-primary-foreground">{unread}</span>
+                      Chats {unread > 0 && <span className="rounded-full bg-badge px-1.5 py-0.2 text-[10px] font-bold text-primary-foreground">{unread}</span>}
                     </span>
                   </Link>
                   <Link
