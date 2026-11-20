@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles, Camera, Upload, CheckCircle2, RotateCw, FileText } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -54,6 +54,55 @@ function Login() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { signIn, demo, setDemo } = useStore();
   const nav = useNavigate();
+
+  // Check if user confirmed via email link while on OTP screen
+  const checkConfirmationStatus = async (showToast = true) => {
+    if (!email || !password) return false;
+    setOtpBusy(true);
+    try {
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (!signInErr && signInData?.user) {
+        setDemo(false);
+        const user = signInData.user;
+        const finalAvatar = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username.trim())}`;
+        const finalBio = bio.trim() || "Living offline first. Exploring the city with Outstagram.";
+        const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        toast.success("Account confirmed! Welcome to Outstagram.");
+        enter(
+          email.trim(),
+          "user",
+          username.trim() || user.user_metadata?.username || "Member",
+          "Account verified — welcome to Outstagram!",
+          user.id,
+          generatedCode,
+          finalAvatar,
+          finalBio
+        );
+        return true;
+      } else if (showToast) {
+        toast.info("Waiting for email confirmation... If you received an email link, please click it first.");
+      }
+    } catch {
+      // ignore
+    } finally {
+      setOtpBusy(false);
+    }
+    return false;
+  };
+
+  // Auto-detect email confirmation link click while user is on the OTP screen
+  useEffect(() => {
+    if (!otpMode || !email || !password) return;
+    const interval = setInterval(() => {
+      checkConfirmationStatus(false);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [otpMode, email, password]);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -421,7 +470,41 @@ function Login() {
       }
 
       if (verifyErr) {
-        setError(verifyErr.message || "Invalid or expired confirmation code. Please check your email or click Resend.");
+        // Auto-recovery: If OTP verification failed (e.g. token expired because the user already clicked
+        // the email confirmation link, or link was used), try signing in with their credentials!
+        if (password) {
+          try {
+            const { data: autoSignIn, error: autoErr } = await supabase.auth.signInWithPassword({
+              email: email.trim(),
+              password: password,
+            });
+
+            if (!autoErr && autoSignIn?.user) {
+              setDemo(false);
+              const user = autoSignIn.user;
+              const finalAvatar = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username.trim())}`;
+              const finalBio = bio.trim() || "Living offline first. Exploring the city with Outstagram.";
+              const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+              toast.success("Account confirmed! Welcome to Outstagram.");
+              enter(
+                email.trim(),
+                "user",
+                username.trim() || user.user_metadata?.username || "Member",
+                "Account verified — welcome to Outstagram!",
+                user.id,
+                generatedCode,
+                finalAvatar,
+                finalBio
+              );
+              return;
+            }
+          } catch {
+            // fallback to showing error
+          }
+        }
+
+        setError(verifyErr.message || "Invalid or expired confirmation code. If you clicked the link in your email, click 'Check Status' below.");
         toast.error(verifyErr.message || "Invalid confirmation code.");
         setOtpBusy(false);
         return;
@@ -576,13 +659,23 @@ function Login() {
                   {otpBusy ? "Verifying code…" : "Verify & Complete Sign Up"}
                 </Button>
 
+                <button
+                  type="button"
+                  onClick={() => checkConfirmationStatus(true)}
+                  disabled={otpBusy}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-sand bg-paper py-2.5 text-xs font-semibold text-ink hover:bg-sand/30 transition-colors"
+                >
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                  Already clicked email link? Check Status & Continue →
+                </button>
+
                 <div className="flex items-center justify-between pt-2 text-xs text-ink-muted">
                   <button
                     type="button"
                     onClick={handleResendOtp}
                     className="font-semibold text-stamp-ink hover:underline"
                   >
-                    Resend Code
+                    Resend Code / Email
                   </button>
                   <button
                     type="button"
@@ -597,7 +690,7 @@ function Login() {
                 </div>
 
                 <p className="text-center text-[11px] text-ink-muted/80 pt-2 border-t border-sand/50">
-                  Tip: You can also click the confirmation link in the email to activate your account directly.
+                  Tip: If your confirmation email only contains a verification link, simply click the link in your email. You will be signed in automatically, or you can click "Check Status & Continue" above.
                 </p>
               </form>
             </div>
