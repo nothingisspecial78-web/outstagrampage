@@ -104,7 +104,7 @@ function MemberProfile({ handle }: { handle: string }) {
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
             <button
-              onClick={() => { const id = startChat(p.name); nav({ to: "/chats/$id", params: { id } }); }}
+              onClick={() => { const id = startChat(p.name, p.id, p.avatar, p.location); nav({ to: "/chats/$id", params: { id } }); }}
               className="inline-flex items-center gap-1.5 rounded-lg bg-stamp px-4 py-2 text-sm font-semibold text-primary-foreground"
             >
               <MessageCircle className="size-4" />Message
@@ -214,7 +214,13 @@ const HIGHLIGHTS = [["Pier", 3], ["Books", 2], ["Bakes", 0], ["Walks", 1]] as co
 
 function Profile() {
   const { user } = Route.useSearch();
-  if (user && user !== ME.handle) return <MemberProfile handle={user} />;
+  const { session } = useStore();
+  const isMe =
+    !user ||
+    user === ME.handle ||
+    (session?.friendCode && user.toLowerCase() === session.friendCode.toLowerCase()) ||
+    (session?.id && user === session.id);
+  if (!isMe && user) return <MemberProfile handle={user} />;
   return <MyProfile />;
 }
 
@@ -298,21 +304,23 @@ function MyProfile() {
     });
   };
 
-
-
-
-
-
-  const handle = ME.handle;
+  const handle = session?.friendCode
+    ? `@${session.friendCode.toLowerCase()}`
+    : session?.name
+      ? `@${session.name.toLowerCase().replace(/\s+/g, "")}`
+      : ME.handle;
+  const myAvatar =
+    session?.avatar ||
+    (session?.name
+      ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.name)}`
+      : ME.avatar);
   const count = (k: Stamp["kind"]) => stamps.filter((s) => s.kind === k).length;
   const stats = [
-    [String(17 + count("quest")), "quests"],
-    [String(8 + count("meetup")), "meetups"],
-    [String(12 + count("place")), "postcards"],
-    [String(5 + count("craft")), "crafts"],
+    [String(count("quest")), "quests"],
+    [String(count("meetup")), "meetups"],
+    [String(count("place")), "postcards"],
+    [String(count("craft")), "crafts"],
   ] as const;
-
-  // Cash withdrawal replaced by physical milestone vouchers & ticket passes
 
   const simulateCheckin = (placeName: string) => {
     addStamp("place", placeName);
@@ -326,7 +334,7 @@ function MyProfile() {
     <div className="mx-auto max-w-[960px] pb-10">
       {/* Profile Header */}
       <header className="flex gap-5 px-1 sm:gap-16 sm:px-6">
-        <Avatar src={ME.avatar} size="size-20 sm:size-36" ring="story" className="shrink-0 self-start" />
+        <Avatar src={myAvatar} size="size-20 sm:size-36" ring="story" className="shrink-0 self-start" />
         <div className="min-w-0 flex-1 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="mr-2 text-xl text-ink font-semibold">{handle}</h1>
@@ -379,57 +387,7 @@ function MyProfile() {
       {/* TAB 1: REWARDS & STAMPS: TICKETS, CHALLENGES & BRAND PERKS */}
       {tab === "rewards" && (
         <div className="space-y-8 py-6">
-          {/* Google Fit Live Step Tracking Station */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border-2 border-sky-300 bg-sky-50/70 p-5 shadow-paper">
-            <div className="flex items-center gap-4">
-              <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-md">
-                <Footprints className="size-7" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-800 uppercase tracking-wider">
-                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" /> Google Fit Connected
-                  </span>
-                  <span className="rounded-full bg-stamp-soft px-2 py-0.5 text-[10px] font-bold text-stamp-ink uppercase">
-                    Live REST Sync
-                  </span>
-                </div>
-                <h3 className="mt-1 font-serif text-xl font-bold text-ink">
-                  18,450 Steps Recorded Today
-                </h3>
-                <p className="text-xs text-ink-muted">
-                  Auto-syncing with Lenskart Optical 20,000 steps challenge & Star Air 50,000 steps flight voucher.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 sm:self-center">
-              <Button
-                size="sm"
-                onClick={async () => {
-                  const s = await syncGoogleFitSteps();
-                  // auto-advance step-based challenges
-                  const lenskart = TICKET_PASSES.find((t) => t.id === "lenskart-frame");
-                  if (lenskart) {
-                    setActiveChallenges((prev) => ({ ...prev, [lenskart.id]: Math.min(20000, (prev[lenskart.id] || 16500) + 2000) }));
-                  }
-                  toast.success("Google Fit steps synced! +2,000 steps added to active brand challenges.");
-                }}
-                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm cursor-pointer"
-              >
-                <Zap className="size-3.5 mr-1 text-amber-300" /> Sync Google Fit
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => connectGoogleFit()}
-                className="border-sand bg-paper hover:bg-line text-xs font-semibold cursor-pointer"
-              >
-                Manage Permissions
-              </Button>
-            </div>
-          </div>
-          {/* A) Presence Points & New User Multiplier Station */}
+          {/* Presence Points & New User Multiplier Station */}
           <section className="relative overflow-hidden rounded-3xl border border-sand bg-gradient-to-br from-paper-raised via-paper to-sand/20 p-6 shadow-paper">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="space-y-2">
@@ -885,7 +843,7 @@ function MyProfile() {
                                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-moss">
                                     <Check className="size-3" /> Stamped
                                   </span>
-                                ) : (
+                               ) : (
                                   <button
                                     onClick={() => simulateCheckin(place)}
                                     className="text-[10px] text-stamp-ink font-semibold hover:underline"
@@ -1040,7 +998,7 @@ function MyProfile() {
         </div>
       )}
 
-      {/* TAB 2: COMMUNITY NOTICEBOARD (Ads as Calm Information - User Request Point 12) */}
+      {/* TAB 2: COMMUNITY NOTICEBOARD */}
       {tab === "bulletin" && (
         <div className="space-y-6 py-6">
           <div className="rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper">

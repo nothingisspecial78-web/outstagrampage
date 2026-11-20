@@ -202,120 +202,137 @@ function RackView() {
         </div>
       </header>
 
-      {/* Progress Dots Indicator */}
-      <div className="flex items-center justify-center gap-1.5 py-1">
-        {rack.map((card, i) => (
-          <button
-            key={card.id}
-            onClick={() => scrollTo(i)}
-            aria-label={`Go to postcard ${i + 1}`}
-            className={cn(
-              "h-1.5 rounded-full transition-all duration-300",
-              activeIndex === i
-                ? "w-6 bg-stamp"
-                : i < activeIndex
-                ? "w-2 bg-stamp-soft"
-                : "w-2 bg-sand hover:bg-sand/80"
-            )}
-          />
-        ))}
-        <button
-          onClick={() => scrollTo(totalItems)}
-          aria-label="Go to end card"
-          className={cn(
-            "h-1.5 rounded-full transition-all duration-300",
-            activeIndex === totalItems ? "w-6 bg-moss" : "w-2 bg-sand"
-          )}
-        />
-      </div>
-
-      {/* Horizontal Carousel Viewport */}
-      <div className="relative">
-        {/* Floating Desktop Navigation Chevrons */}
-        <button
-          onClick={scrollPrev}
-          disabled={activeIndex === 0}
-          aria-label="Scroll left"
-          className={cn(
-            "hidden md:grid absolute -left-5 top-1/2 -translate-y-1/2 z-20 size-11 place-items-center rounded-full border border-sand bg-paper-raised/95 text-ink shadow-postcard backdrop-blur transition-all hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
-          )}
-        >
-          <ChevronLeft className="size-6" />
-        </button>
-
-        <button
-          onClick={scrollNext}
-          disabled={activeIndex >= totalItems}
-          aria-label="Scroll right"
-          className={cn(
-            "hidden md:grid absolute -right-5 top-1/2 -translate-y-1/2 z-20 size-11 place-items-center rounded-full border border-sand bg-paper-raised/95 text-ink shadow-postcard backdrop-blur transition-all hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
-          )}
-        >
-          <ChevronRight className="size-6" />
-        </button>
-
-        {/* Scrollable track */}
-        <div
-          ref={containerRef}
-          onScroll={updateActiveIndex}
-          className="snap-rack flex items-center overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 pt-3 gap-6 px-2 sm:px-6 md:px-8 cursor-grab active:cursor-grabbing"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
-          {rack.map((card, i) => (
-            <div
-              key={card.id}
+      {totalItems === 0 ? (
+        <div className="paper-card mx-auto my-12 max-w-md p-8 text-center">
+          <Camera className="mx-auto size-12 text-stamp" />
+          <h2 className="mt-4 font-serif text-2xl font-bold text-ink">No moments shared yet today</h2>
+          <p className="mt-2 text-sm text-ink-muted leading-relaxed">
+            Be the first person in your neighborhood to capture and share an authentic real-world postcard.
+          </p>
+          <Button asChild className="mt-5 bg-stamp text-primary-foreground">
+            <Link to="/capture">
+              <Camera className="mr-2 size-4" /> Capture Postcard
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* Progress Dots Indicator */}
+          <div className="flex items-center justify-center gap-1.5 py-1">
+            {rack.map((card, i) => (
+              <button
+                key={card.id}
+                onClick={() => scrollTo(i)}
+                aria-label={`Go to postcard ${i + 1}`}
+                className={cn(
+                  "h-1.5 rounded-full transition-all duration-300",
+                  activeIndex === i
+                    ? "w-6 bg-stamp"
+                    : i < activeIndex
+                    ? "w-2 bg-stamp-soft"
+                    : "w-2 bg-sand hover:bg-sand/80"
+                )}
+              />
+            ))}
+            <button
+              onClick={() => scrollTo(totalItems)}
+              aria-label="Go to end card"
               className={cn(
-                "snap-center shrink-0 w-[86vw] max-w-[540px] sm:w-[500px] transition-transform duration-300",
-                activeIndex === i ? "scale-100 opacity-100" : "scale-[0.98] opacity-85 hover:opacity-100"
+                "h-1.5 rounded-full transition-all duration-300",
+                activeIndex === totalItems ? "w-6 bg-moss" : "w-2 bg-sand"
+              )}
+            />
+          </div>
+
+          {/* Horizontal Carousel Viewport */}
+          <div className="relative">
+            {/* Floating Desktop Navigation Chevrons */}
+            <button
+              onClick={scrollPrev}
+              disabled={activeIndex === 0}
+              aria-label="Scroll left"
+              className={cn(
+                "hidden md:grid absolute -left-5 top-1/2 -translate-y-1/2 z-20 size-11 place-items-center rounded-full border border-sand bg-paper-raised/95 text-ink shadow-postcard backdrop-blur transition-all hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
               )}
             >
-              <Postcard
-                card={card}
-                onThank={() => setSelectedCard(card)}
-              />
-            </div>
-          ))}
+              <ChevronLeft className="size-6" />
+            </button>
 
-          {/* End of Rack Card */}
-          <div className="snap-center shrink-0 w-[86vw] max-w-[500px] sm:w-[460px]">
-            <article className="postcard-frame relative flex flex-col items-center justify-center p-8 text-center rounded-2xl border-2 border-dashed border-sand bg-paper-raised">
-              <Postmark place="End of Rack" date="TODAY" tone="moss" className="size-24 mb-4" />
-              <h2 className="font-serif text-2xl font-bold text-ink">You've reached the end!</h2>
-              <p className="mt-2 text-sm text-ink-muted leading-relaxed">
-                Outstagram has no endless scroll or infinite feeds. You’ve seen all {totalItems} moments from people nearby today.
-              </p>
-              <p className="mt-2 font-hand text-xl text-stamp-ink">
-                Put your phone down, step outside, or make a quiet moment of your own.
-              </p>
+            <button
+              onClick={scrollNext}
+              disabled={activeIndex >= totalItems}
+              aria-label="Scroll right"
+              className={cn(
+                "hidden md:grid absolute -right-5 top-1/2 -translate-y-1/2 z-20 size-11 place-items-center rounded-full border border-sand bg-paper-raised/95 text-ink shadow-postcard backdrop-blur transition-all hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+              )}
+            >
+              <ChevronRight className="size-6" />
+            </button>
 
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 w-full">
-                <Button asChild className="flex-1 bg-stamp text-primary-foreground">
-                  <Link to="/capture">
-                    <Camera className="size-4" /> Share a postcard
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="flex-1 border-sand">
-                  <Link to="/quest">
-                    <Footprints className="size-4" /> Today's quest
-                  </Link>
-                </Button>
+            {/* Scrollable track */}
+            <div
+              ref={containerRef}
+              onScroll={updateActiveIndex}
+              className="snap-rack flex items-center overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 pt-3 gap-6 px-2 sm:px-6 md:px-8 cursor-grab active:cursor-grabbing"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {rack.map((card, i) => (
+                <div
+                  key={card.id}
+                  className={cn(
+                    "snap-center shrink-0 w-[86vw] max-w-[540px] sm:w-[500px] transition-transform duration-300",
+                    activeIndex === i ? "scale-100 opacity-100" : "scale-[0.98] opacity-85 hover:opacity-100"
+                  )}
+                >
+                  <Postcard
+                    card={card}
+                    onThank={() => setSelectedCard(card)}
+                  />
+                </div>
+              ))}
+
+              {/* End of Rack Card */}
+              <div className="snap-center shrink-0 w-[86vw] max-w-[500px] sm:w-[460px]">
+                <article className="postcard-frame relative flex flex-col items-center justify-center p-8 text-center rounded-2xl border-2 border-dashed border-sand bg-paper-raised">
+                  <Postmark place="End of Rack" date="TODAY" tone="moss" className="size-24 mb-4" />
+                  <h2 className="font-serif text-2xl font-bold text-ink">You've reached the end!</h2>
+                  <p className="mt-2 text-sm text-ink-muted leading-relaxed">
+                    Outstagram has no endless scroll or infinite feeds. You’ve seen all {totalItems} moments from people nearby today.
+                  </p>
+                  <p className="mt-2 font-hand text-xl text-stamp-ink">
+                    Put your phone down, step outside, or make a quiet moment of your own.
+                  </p>
+
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3 w-full">
+                    <Button asChild className="flex-1 bg-stamp text-primary-foreground">
+                      <Link to="/capture">
+                        <Camera className="size-4" /> Share a postcard
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="flex-1 border-sand">
+                      <Link to="/quest">
+                        <Footprints className="size-4" /> Today's quest
+                      </Link>
+                    </Button>
+                  </div>
+
+                  <button
+                    onClick={() => scrollTo(0)}
+                    className="mt-4 text-xs font-semibold text-ink-muted hover:text-ink underline"
+                  >
+                    ← Back to beginning
+                  </button>
+                </article>
               </div>
-
-              <button
-                onClick={() => scrollTo(0)}
-                className="mt-4 text-xs font-semibold text-ink-muted hover:text-ink underline"
-              >
-                ← Back to beginning
-              </button>
-            </article>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="flex items-center justify-between px-2 text-xs text-ink-muted">
-        <span>Use <kbd className="rounded border border-sand bg-paper px-1.5 py-0.5 text-[11px] font-mono">←</kbd> <kbd className="rounded border border-sand bg-paper px-1.5 py-0.5 text-[11px] font-mono">→</kbd> keys or swipe sideways</span>
-        <span>{totalItems} finite postcards today</span>
-      </div>
+          <div className="flex items-center justify-between px-2 text-xs text-ink-muted">
+            <span>Use <kbd className="rounded border border-sand bg-paper px-1.5 py-0.5 text-[11px] font-mono">←</kbd> <kbd className="rounded border border-sand bg-paper px-1.5 py-0.5 text-[11px] font-mono">→</kbd> keys or swipe sideways</span>
+            <span>{totalItems} finite postcards today</span>
+          </div>
+        </>
+      )}
 
       <ThankYou card={selectedCard} onClose={() => setSelectedCard(null)} />
       <DigitalTicketModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
