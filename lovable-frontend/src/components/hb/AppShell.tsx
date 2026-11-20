@@ -1,9 +1,9 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift, Compass } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift, Compass, Bell } from "lucide-react";
+import { useState, useEffect, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStore } from "@/lib/store";
-import { ME, PEOPLE, searchPeople } from "@/lib/people";
+import { ME, searchRealUsers, getCachedRealUsers, type Person } from "@/lib/people";
 import { cn } from "@/lib/utils";
 
 export function Wordmark({ className }: { className?: string }) {
@@ -34,22 +34,18 @@ const MORE = [
   { to: "/places", label: "Places & Offers", icon: StoreIcon },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
-const NOTES = [
-  { p: PEOPLE[0]!, t: "sent you a thank-you on your Riverside Cafe postcard.", time: "2h" },
-  { p: PEOPLE[2]!, t: "met you at Linden Park. Chat unlocked +20.", time: "1d" },
-  { p: PEOPLE[1]!, t: "started following you.", time: "2d" },
-  { p: PEOPLE[4]!, t: "liked your moment.", time: "3d" },
-];
+const NOTES: { p: { name: string; handle: string; avatar: string }; t: string; time: string }[] = [];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { demo, chats, session, signOut } = useStore();
   const navigate = useNavigate();
   const isAdmin = session?.role === "admin";
+  const myAvatar = session?.avatar || (session?.name ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.name)}` : ME.avatar);
   const path = useLocation({ select: (l) => l.pathname });
   const search = useLocation({ select: (l) => l.search as Record<string, string | undefined> });
   const [panel, setPanel] = useState<Panel>(null);
   const [seenNotes, setSeenNotes] = useState(false);
-  const unread = 2;
+  const unread = chats.filter((c) => c.messages.some((m) => !m.mine)).length;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
   const on = (to: string) => panel === null && (to === "/" ? path === "/" : path.startsWith(to));
   const isRewardsActive = on("/passport") && (search?.tab === "rewards" || (!search?.tab && !path.startsWith("/passport/")));
@@ -82,7 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button className="group text-left" onClick={() => toggle("search")}>{item("Search", <Search className="size-6" />, panel === "search")}</button>
           <Link to="/capture" className="group" onClick={() => setPanel(null)}>{item("Create", <PlusSquare className="size-6" />, on("/capture"))}</Link>
           <Link to="/passport" search={{ tab: "rewards" }} className="group" onClick={() => setPanel(null)}>{item("Rewards", <Gift className={cn("size-6", isRewardsActive && "text-stamp stroke-[2.5]")} />, isRewardsActive)}</Link>
-          <Link to="/passport" search={{ tab: "stamps" }} className="group" onClick={() => setPanel(null)}>{item("Passport", <Avatar src={ME.avatar} size="size-6" className={cn(isPassportActive && "rounded-full ring-2 ring-ink")} />, isPassportActive)}</Link>
+          <Link to="/passport" search={{ tab: "stamps" }} className="group" onClick={() => setPanel(null)}>{item("Passport", <Avatar src={myAvatar} size="size-6" className={cn(isPassportActive && "rounded-full ring-2 ring-ink")} />, isPassportActive)}</Link>
           <div className="mt-auto flex flex-col gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger className="group text-left outline-none">{item("More", <Menu className="size-6" />, false)}</DropdownMenuTrigger>
@@ -191,7 +187,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     onClick={() => setPanel(null)}
                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium text-ink transition-colors hover:bg-line"
                   >
-                    <Avatar src={ME.avatar} size="size-5" />
+                    <Avatar src={myAvatar} size="size-5" />
                     <span>Passport & Stamps</span>
                   </Link>
 
@@ -261,15 +257,25 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </button>
                 </div>
               ) : (
-                <ul className="px-3 py-4">
-                  <p className="px-3 pb-2 text-sm font-bold text-ink">This week</p>
-                  {NOTES.map((n, i) => (
-                    <li key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-line">
-                      <Avatar src={n.p.avatar} size="size-11" />
-                      <p className="flex-1 text-sm text-ink"><b>{n.p.handle}</b> {n.t} <span className="text-ink-muted">{n.time}</span></p>
-                    </li>
-                  ))}
-                </ul>
+                <div className="px-3 py-4">
+                  <p className="px-3 pb-2 text-sm font-bold text-ink">Notifications</p>
+                  {NOTES.length > 0 ? (
+                    <ul>
+                      {NOTES.map((n, i) => (
+                        <li key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-line">
+                          <Avatar src={n.p.avatar} size="size-11" />
+                          <p className="flex-1 text-sm text-ink"><b>{n.p.handle}</b> {n.t} <span className="text-ink-muted">{n.time}</span></p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="px-4 py-10 text-center">
+                      <Bell className="mx-auto mb-2 size-8 text-ink-muted/50" />
+                      <p className="text-sm font-semibold text-ink">No notifications yet</p>
+                      <p className="mt-1 text-xs text-ink-muted">When friends interact with your postcards or stamps, you'll see them here.</p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </section>
@@ -323,7 +329,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
           <li><Link to="/capture" aria-label="Capture" className="-mt-5 grid size-12 place-items-center rounded-full bg-stamp text-primary-foreground shadow-postcard"><PlusSquare className="size-6" /></Link></li>
           <li><Link to="/passport" search={{ tab: "rewards" }} aria-label="Rewards" onClick={() => setPanel(null)}><Gift className={cn("size-6 transition-all", isRewardsActive ? "stroke-[2.5] text-stamp" : "text-ink")} /></Link></li>
-          <li><Link to="/passport" search={{ tab: "stamps" }} aria-label="Passport" onClick={() => setPanel(null)}><Avatar src={ME.avatar} size="size-6" className={cn("rounded-full transition-all", isPassportActive && "ring-2 ring-ink")} /></Link></li>
+          <li><Link to="/passport" search={{ tab: "stamps" }} aria-label="Passport" onClick={() => setPanel(null)}><Avatar src={myAvatar} size="size-6" className={cn("rounded-full transition-all", isPassportActive && "ring-2 ring-ink")} /></Link></li>
         </ul>
       </nav>
     </div>
@@ -331,22 +337,53 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function SearchPanel({ onPick }: { onPick: () => void }) {
+  const { session } = useStore();
   const [q, setQ] = useState("");
-  const all = searchPeople(q);
+  const [results, setResults] = useState<Person[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    searchRealUsers(q, session?.id || session?.name).then((res) => {
+      if (active) setResults(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, [q, session?.id, session?.name]);
+
   return (
     <div>
       <div className="px-6 pb-4">
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, handle or friend code" className="h-10 w-full rounded-lg bg-line px-4 text-sm text-ink outline-none placeholder:text-ink-muted" />
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, handle or friend code"
+          className="h-10 w-full rounded-lg bg-line px-4 text-sm text-ink outline-none placeholder:text-ink-muted"
+        />
       </div>
       <div className="border-t border-sand px-3 pt-3">
-        <p className="px-3 pb-2 font-bold text-ink">{q ? "Results" : "Recent"}</p>
-        {all.slice(0, 8).map((p) => (
-          <Link key={p.handle} to="/passport" search={{ user: p.handle }} onClick={onPick} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-line">
+        <p className="px-3 pb-2 font-bold text-ink">{q ? "Results" : "Recent Members"}</p>
+        {results.slice(0, 8).map((p) => (
+          <Link
+            key={p.id || p.handle}
+            to="/passport"
+            search={{ user: p.handle }}
+            onClick={onPick}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-line"
+          >
             <Avatar src={p.avatar} size="size-11" />
-            <span><span className="block text-sm font-semibold text-ink">{p.handle}</span><span className="text-sm text-ink-muted">{p.name}</span></span>
+            <span>
+              <span className="block text-sm font-semibold text-ink">{p.handle}</span>
+              <span className="text-sm text-ink-muted">{p.name}</span>
+            </span>
           </Link>
         ))}
-        {all.length === 0 && <p className="px-3 py-6 text-sm text-ink-muted">No results found.</p>}
+        {results.length === 0 && (
+          <p className="px-3 py-6 text-center text-sm text-ink-muted">
+            {q ? "No members match your search." : "No members found yet. Tell friends to sign up!"}
+          </p>
+        )}
       </div>
     </div>
   );

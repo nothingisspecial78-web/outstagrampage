@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FakeQR } from "@/components/hb/CodeSheet";
 import { useStore } from "@/lib/store";
-import { PEOPLE } from "@/lib/people";
+import { getCachedRealUsers } from "@/lib/people";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/group")({
@@ -70,7 +70,12 @@ function Group() {
           <p className="mt-4 font-mono text-3xl font-extrabold tracking-[0.3em] text-ink">731 406</p>
           <p className="mt-1 text-sm text-ink-muted">{Math.min(joined, need)} of {need} needed · code expires in 10 min</p>
           <div className="mt-4 flex justify-center -space-x-2">
-            {PEOPLE.slice(0, Math.min(joined, need)).map((p) => <img key={p.handle} src={p.avatar} alt={p.name} className="animate-rise size-10 rounded-full border-2 border-paper-raised" />)}
+            {Array.from({ length: Math.min(joined, need) }).map((_, i) => {
+              const real = getCachedRealUsers();
+              const p = real[i];
+              const avatar = p?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=Friend${i + 1}`;
+              return <img key={i} src={avatar} alt={`Friend ${i + 1}`} className="animate-rise size-10 rounded-full border-2 border-paper-raised" />;
+            })}
           </div>
           <Button className="mt-5 w-full" disabled={joined < need} onClick={finish}>{joined < need ? "Waiting for friends…" : <><Check /> Everyone's here — stamp it</>}</Button>
         </section>

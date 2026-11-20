@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { CharCount, Avatar } from "@/components/hb/AppShell";
 import { Postmark } from "@/components/hb/Postmark";
 import { captionValid, useStore } from "@/lib/store";
-import { ME, PEOPLE } from "@/lib/people";
+import { ME, getCachedRealUsers, type Person } from "@/lib/people";
 import { cn } from "@/lib/utils";
 import cafe from "@/assets/pc-cafe.jpg";
 import { submitPostcard } from "@/lib/api";
@@ -689,23 +689,27 @@ function Capture() {
             <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ink">
               <UserPlus className="size-4" /> Tag friends you're with
             </p>
-            <div className="flex gap-2">
-              {PEOPLE.slice(0, 5).map((p) => (
-                <button
-                  key={p.handle}
-                  onClick={() =>
-                    setTags((t) => (t.includes(p.handle) ? t.filter((x) => x !== p.handle) : [...t, p.handle]))
-                  }
-                  aria-label={p.handle}
-                  className={cn(
-                    "rounded-full cursor-pointer",
-                    tags.includes(p.handle) && "ring-2 ring-stamp ring-offset-2 ring-offset-paper-raised"
-                  )}
-                >
-                  <Avatar src={p.avatar} size="size-9" />
-                </button>
-              ))}
-            </div>
+            {getCachedRealUsers().length > 0 ? (
+              <div className="flex gap-2">
+                {getCachedRealUsers().slice(0, 5).map((p) => (
+                  <button
+                    key={p.handle}
+                    onClick={() =>
+                      setTags((t) => (t.includes(p.handle) ? t.filter((x) => x !== p.handle) : [...t, p.handle]))
+                    }
+                    aria-label={p.handle}
+                    className={cn(
+                      "rounded-full cursor-pointer",
+                      tags.includes(p.handle) && "ring-2 ring-stamp ring-offset-2 ring-offset-paper-raised"
+                    )}
+                  >
+                    <Avatar src={p.avatar} size="size-9" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-ink-muted">No friends nearby to tag yet. Connect with members in Messages to tag them in your moments.</p>
+            )}
           </div>
 
           <button

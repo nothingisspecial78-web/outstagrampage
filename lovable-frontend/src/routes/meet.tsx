@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { ScanLine, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PEOPLE } from "@/lib/people";
 import { WaxSeal } from "@/components/hb/EnvelopeLock";
 import { DEMO_CODE } from "@/components/hb/CodeSheet";
 import { Postmark } from "@/components/hb/Postmark";
@@ -28,12 +27,13 @@ function Meet() {
   const { chats, unlock } = useStore();
   const [mode, setMode] = useState<"code" | "scan">("code");
   const [digits, setDigits] = useState(Array(6).fill(""));
-  const [who, setWho] = useState(chats.find((c) => c.messages.length >= c.limit)?.id ?? chats[0]!.id);
+  const [who, setWho] = useState(chats.find((c) => c.messages.length >= c.limit)?.id ?? chats[0]?.id ?? "");
   const [error, setError] = useState(false);
   const [done, setDone] = useState<Chat | null>(null);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   const verify = async (code: string) => {
+    if (!who) return;
     const cleanCode = code.replace(/\D/g, "");
     if (code === DEMO_CODE || cleanCode === "731406" || cleanCode === "482913") {
       setDone(unlock(who));
@@ -74,45 +74,60 @@ function Meet() {
         <h1 className="mt-3 text-2xl font-extrabold text-ink">Meet to unlock</h1>
         <p className="text-sm text-ink-muted">Together in person? Swap a code to break the seal and get 20 more messages.</p>
       </div>
-      <p className="mb-2 text-xs font-bold tracking-wider text-ink-muted uppercase">Who are you with?</p>
-      <div className="no-scrollbar mb-5 flex gap-4 overflow-x-auto pb-1">
-        {chats.map((c) => {
-          const p = PEOPLE.find((x) => x.name.startsWith(c.name));
-          const locked = c.messages.length >= c.limit;
-          return (
-            <button key={c.id} onClick={() => setWho(c.id)} className="flex shrink-0 flex-col items-center gap-1">
-              <span className={cn("rounded-full p-[2px]", who === c.id ? "story-ring" : "bg-transparent")}><span className="block rounded-full border-2 border-paper bg-paper">{p ? <img src={p.avatar} alt="" className="size-14 rounded-full object-cover" /> : <span className="grid size-14 place-items-center rounded-full bg-line font-bold">{c.name[0]}</span>}</span></span>
-              <span className={cn("text-xs", who === c.id ? "font-bold text-ink" : "text-ink-muted")}>{c.name}{locked ? " 🔒" : ""}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="rounded-3xl border border-sand bg-paper-raised p-6 shadow-paper">
-        <div className="mb-6 grid grid-cols-2 rounded-xl bg-line p-1 text-sm">
-          <button onClick={() => setMode("code")} className={cn("flex items-center justify-center gap-1.5 rounded-lg py-2", mode === "code" ? "bg-paper-raised font-semibold text-ink shadow-paper" : "text-ink-muted")}><KeyRound className="size-4" /> Enter code</button>
-          <button onClick={() => setMode("scan")} className={cn("flex items-center justify-center gap-1.5 rounded-lg py-2", mode === "scan" ? "bg-paper-raised font-semibold text-ink shadow-paper" : "text-ink-muted")}><ScanLine className="size-4" /> Scan QR</button>
+
+      {chats.length === 0 ? (
+        <div className="rounded-3xl border border-sand bg-paper-raised p-8 text-center shadow-paper">
+          <p className="text-base font-bold text-ink">No conversations started yet</p>
+          <p className="mt-2 text-sm text-ink-muted">Connect with a member in Messages first. When you meet in person, exchange codes here to break seals and earn shared passport stamps.</p>
+          <Button asChild className="mt-6"><Link to="/chats">Open Messages</Link></Button>
         </div>
-        {mode === "code" ? (
-          <>
-            <div className={cn("flex justify-center gap-2", error && "animate-[shake_.3s] [&_input]:border-stamp")}>
-              {digits.map((d, i) => (
-                <input key={i} ref={(el) => { refs.current[i] = el; }} value={d} inputMode="numeric" maxLength={6} aria-label={`Digit ${i + 1}`}
-                  onChange={(e) => setAt(i, e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Backspace" && !d && i > 0) refs.current[i - 1]?.focus(); }}
-                  autoFocus={i === 0} className="h-14 w-11 rounded-xl border-2 border-sand bg-paper text-center text-2xl font-extrabold sm:h-16 sm:w-12 text-ink transition-all focus:-translate-y-0.5 focus:border-stamp focus:shadow-paper focus:outline-none" />
-              ))}
-            </div>
-            <p className="mt-4 text-center text-sm text-ink-muted">{error ? <span className="text-stamp-ink">That code doesn't match. Try again.</span> : <>Demo code: <span className="font-mono">{DEMO_CODE}</span></>}</p>
-          </>
-        ) : (
-          <div className="relative mx-auto aspect-square w-full max-w-64 overflow-hidden rounded-3xl bg-ink">
-            {["top-4 left-4 border-t-4 border-l-4", "top-4 right-4 border-t-4 border-r-4", "bottom-4 left-4 border-b-4 border-l-4", "bottom-4 right-4 border-b-4 border-r-4"].map((c) => <span key={c} className={`absolute size-10 rounded-sm border-stamp ${c}`} />)}
-            <span className="animate-scan absolute inset-x-8 h-0.5 bg-stamp shadow-[0_0_12px_var(--stamp)]" />
-            <p className="absolute inset-x-0 bottom-6 text-center text-xs text-paper-raised/80">Point at your friend's code</p>
-            <button onClick={() => verify(DEMO_CODE)} className="absolute inset-0" aria-label="Simulate a successful scan" />
+      ) : (
+        <>
+          <p className="mb-2 text-xs font-bold tracking-wider text-ink-muted uppercase">Who are you with?</p>
+          <div className="no-scrollbar mb-5 flex gap-4 overflow-x-auto pb-1">
+            {chats.map((c) => {
+              const avatarSrc = c.peerAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`;
+              const locked = c.messages.length >= c.limit;
+              return (
+                <button key={c.id} onClick={() => setWho(c.id)} className="flex shrink-0 flex-col items-center gap-1">
+                  <span className={cn("rounded-full p-[2px]", who === c.id ? "story-ring" : "bg-transparent")}>
+                    <span className="block rounded-full border-2 border-paper bg-paper">
+                      <img src={avatarSrc} alt="" className="size-14 rounded-full object-cover" />
+                    </span>
+                  </span>
+                  <span className={cn("text-xs", who === c.id ? "font-bold text-ink" : "text-ink-muted")}>{c.name}{locked ? " 🔒" : ""}</span>
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
+          <div className="rounded-3xl border border-sand bg-paper-raised p-6 shadow-paper">
+            <div className="mb-6 grid grid-cols-2 rounded-xl bg-line p-1 text-sm">
+              <button onClick={() => setMode("code")} className={cn("flex items-center justify-center gap-1.5 rounded-lg py-2", mode === "code" ? "bg-paper-raised font-semibold text-ink shadow-paper" : "text-ink-muted")}><KeyRound className="size-4" /> Enter code</button>
+              <button onClick={() => setMode("scan")} className={cn("flex items-center justify-center gap-1.5 rounded-lg py-2", mode === "scan" ? "bg-paper-raised font-semibold text-ink shadow-paper" : "text-ink-muted")}><ScanLine className="size-4" /> Scan QR</button>
+            </div>
+            {mode === "code" ? (
+              <>
+                <div className={cn("flex justify-center gap-2", error && "animate-[shake_.3s] [&_input]:border-stamp")}>
+                  {digits.map((d, i) => (
+                    <input key={i} ref={(el) => { refs.current[i] = el; }} value={d} inputMode="numeric" maxLength={6} aria-label={`Digit ${i + 1}`}
+                      onChange={(e) => setAt(i, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Backspace" && !d && i > 0) refs.current[i - 1]?.focus(); }}
+                      autoFocus={i === 0} className="h-14 w-11 rounded-xl border-2 border-sand bg-paper text-center text-2xl font-extrabold sm:h-16 sm:w-12 text-ink transition-all focus:-translate-y-0.5 focus:border-stamp focus:shadow-paper focus:outline-none" />
+                  ))}
+                </div>
+                <p className="mt-4 text-center text-sm text-ink-muted">{error ? <span className="text-stamp-ink">That code doesn't match. Try again.</span> : <>Demo code: <span className="font-mono">{DEMO_CODE}</span></>}</p>
+              </>
+            ) : (
+              <div className="relative mx-auto aspect-square w-full max-w-64 overflow-hidden rounded-3xl bg-ink">
+                {["top-4 left-4 border-t-4 border-l-4", "top-4 right-4 border-t-4 border-r-4", "bottom-4 left-4 border-b-4 border-l-4", "bottom-4 right-4 border-b-4 border-r-4"].map((c) => <span key={c} className={`absolute size-10 rounded-sm border-stamp ${c}`} />)}
+                <span className="animate-scan absolute inset-x-8 h-0.5 bg-stamp shadow-[0_0_12px_var(--stamp)]" />
+                <p className="absolute inset-x-0 bottom-6 text-center text-xs text-paper-raised/80">Point at your friend's code</p>
+                <button onClick={() => verify(DEMO_CODE)} className="absolute inset-0" aria-label="Simulate a successful scan" />
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
