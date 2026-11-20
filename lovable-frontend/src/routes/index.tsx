@@ -3,7 +3,6 @@ import { Hourglass, ArrowRight, Gift, Lock, Sparkles, Users, Hammer, MapPinned, 
 import { QuestCard } from "@/components/hb/QuestCard";
 import { WaxSeal } from "@/components/hb/EnvelopeLock";
 import { RACK, useStore } from "@/lib/store";
-import { PEOPLE } from "@/lib/people";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -39,7 +38,7 @@ function Today() {
   const { hours, seen, rack, chats, stamps, session } = useStore();
   const activeRack = rack || RACK;
   const left = Math.max(0, activeRack.length - seen);
-  const first = (session?.name ?? "Sam").split(" ")[0];
+  const first = (session?.name ?? "Friend").split(" ")[0];
 
   return (
     <div className="space-y-5 px-4 pt-5 sm:px-0 md:pt-0">
@@ -60,31 +59,39 @@ function Today() {
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
           <div className="flex items-center justify-between"><h2 className="font-serif text-xl font-semibold text-ink">Today's rack</h2><span className="text-sm text-ink-muted">{left} of {activeRack.length} left</span></div>
-          <div className="mt-4 flex -space-x-4 sm:-space-x-6 overflow-hidden py-1">
-            {activeRack.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-20 sm:w-24 shrink-0 rounded-sm border-2 sm:border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-2" : "-rotate-2")} />)}
-          </div>
-          <p className="mt-4 text-sm text-ink-muted">{left ? "Ten postcards from friends, sideways, then it ends." : "You've seen everything. Go outside."}</p>
+          {activeRack.length === 0 ? (
+            <div className="py-6 text-center text-sm text-ink-muted">No postcards shared yet today. Be the first to share one!</div>
+          ) : (
+            <div className="mt-4 flex -space-x-4 sm:-space-x-6 overflow-hidden py-1">
+              {activeRack.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-20 sm:w-24 shrink-0 rounded-sm border-2 sm:border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-2" : "-rotate-2")} />)}
+            </div>
+          )}
+          <p className="mt-4 text-sm text-ink-muted">{left ? "Finite postcards from friends nearby, sideways, then it ends." : "You've seen everything. Go outside."}</p>
           <Link to="/rack" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground">Open today's rack <ArrowRight className="size-4" /></Link>
         </Card>
 
         <Card>
           <div className="flex items-center justify-between"><h2 className="font-serif text-xl font-semibold text-ink">Friends</h2><Link to="/chats" className="text-sm font-semibold text-stamp-ink">All chats</Link></div>
-          <ul className="mt-3 divide-y divide-line">
-            {chats.map((c) => {
-              const p = PEOPLE.find((x) => x.name.startsWith(c.name));
-              const n = c.messages.length, locked = n >= c.limit;
-              return (
-                <li key={c.id}><Link to="/chats/$id" params={{ id: c.id }} className="flex items-center gap-3 py-3">
-                  {p ? <img src={p.avatar} alt="" className="size-10 rounded-full object-cover" /> : <span className="grid size-10 place-items-center rounded-full bg-line font-semibold">{c.name[0]}</span>}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-ink">{c.name}</p>
-                    <div className="mt-1 h-1 overflow-hidden rounded-full bg-line"><div className={cn("h-full", locked ? "bg-stamp" : "bg-ink-muted")} style={{ width: `${Math.min(100, (n / c.limit) * 100)}%` }} /></div>
-                  </div>
-                  {locked ? <span className="flex items-center gap-1.5 text-xs font-semibold text-stamp-ink"><WaxSeal className="size-6" /> Meet to unlock</span> : <span className="text-xs tabular-nums text-ink-muted">{n} of {c.limit}</span>}
-                </Link></li>
-              );
-            })}
-          </ul>
+          {chats.length === 0 ? (
+            <div className="py-6 text-center text-sm text-ink-muted">No chats yet. Connect with a registered member to start chatting!</div>
+          ) : (
+            <ul className="mt-3 divide-y divide-line">
+              {chats.map((c) => {
+                const avatarSrc = c.peerAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(c.name)}`;
+                const n = c.messages.length, locked = n >= c.limit;
+                return (
+                  <li key={c.id}><Link to="/chats/$id" params={{ id: c.id }} className="flex items-center gap-3 py-3">
+                    {avatarSrc ? <img src={avatarSrc} alt="" className="size-10 rounded-full object-cover" /> : <span className="grid size-10 place-items-center rounded-full bg-line font-semibold">{c.name[0]}</span>}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-ink">{c.name}</p>
+                      <div className="mt-1 h-1 overflow-hidden rounded-full bg-line"><div className={cn("h-full", locked ? "bg-stamp" : "bg-ink-muted")} style={{ width: `${Math.min(100, (n / c.limit) * 100)}%` }} /></div>
+                    </div>
+                    {locked ? <span className="flex items-center gap-1.5 text-xs font-semibold text-stamp-ink"><WaxSeal className="size-6" /> Meet to unlock</span> : <span className="text-xs tabular-nums text-ink-muted">{n} of {c.limit}</span>}
+                  </Link></li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
 
         <Card>

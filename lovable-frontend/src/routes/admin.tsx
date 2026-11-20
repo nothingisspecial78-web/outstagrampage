@@ -73,20 +73,26 @@ function Admin() {
         </TabsList>
 
         <TabsContent value="reports" className="mt-4 space-y-3">
-          {st.reports.map((r) => (
-            <div key={r.id} className="paper-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2"><p className="font-semibold text-ink">{r.what}</p><span className={pill(r.status)}>{r.status}</span></div>
-                <p className="text-sm text-ink-muted">“{r.reason}” · reported by {r.by}</p>
-              </div>
-              {r.status === "open" && (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => { st.resolveReport(r.id, "kept"); toast("Kept — reporter notified"); }}><Check /> Keep</Button>
-                  <Button size="sm" variant="destructive" onClick={() => { st.resolveReport(r.id, "removed"); toast.success("Removed"); }}><Trash2 /> Remove</Button>
-                </div>
-              )}
+          {st.reports.length === 0 ? (
+            <div className="paper-card p-6 text-center text-sm text-ink-muted">
+              No open reports. Outstagram is kind and peaceful.
             </div>
-          ))}
+          ) : (
+            st.reports.map((r) => (
+              <div key={r.id} className="paper-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2"><p className="font-semibold text-ink">{r.what}</p><span className={pill(r.status)}>{r.status}</span></div>
+                  <p className="text-sm text-ink-muted">“{r.reason}” · reported by {r.by}</p>
+                </div>
+                {r.status === "open" && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { st.resolveReport(r.id, "kept"); toast("Kept — reporter notified"); }}><Check /> Keep</Button>
+                    <Button size="sm" variant="destructive" onClick={() => { st.resolveReport(r.id, "removed"); toast.success("Removed"); }}><Trash2 /> Remove</Button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </TabsContent>
 
         <TabsContent value="offers" className="mt-4 space-y-3">
@@ -109,17 +115,21 @@ function Admin() {
 
         <TabsContent value="members" className="mt-4">
           <div className="paper-card divide-y divide-line">
-            {st.members.map((m) => (
-              <div key={m.id} className="flex flex-wrap items-center gap-3 p-4">
-                <span className="grid size-10 place-items-center rounded-full bg-stamp-soft font-bold text-stamp-ink">{m.name[0]}</span>
-                <div className="min-w-0 flex-1"><p className="font-semibold text-ink">{m.name}</p><p className="text-xs text-ink-muted">@{m.handle} · joined {m.joined}</p></div>
-                <select value={m.role} onChange={(e) => { st.setMember(m.id, { role: e.target.value as typeof m.role }); toast(`${m.name} is now ${e.target.value}`); }} aria-label={`Role for ${m.name}`}
-                  className="rounded-lg border border-sand bg-paper px-2 py-1.5 text-sm text-ink">
-                  <option value="user">Member</option><option value="partner">Partner</option><option value="admin">Admin</option>
-                </select>
-                <button onClick={() => st.setMember(m.id, { status: m.status === "active" ? "suspended" : "active" })} className={pill(m.status)}>{m.status}</button>
-              </div>
-            ))}
+            {st.members.length === 0 ? (
+              <p className="p-6 text-center text-sm text-ink-muted">No registered members yet.</p>
+            ) : (
+              st.members.map((m) => (
+                <div key={m.id} className="flex flex-wrap items-center gap-3 p-4">
+                  <span className="grid size-10 place-items-center rounded-full bg-stamp-soft font-bold text-stamp-ink">{m.name[0]}</span>
+                  <div className="min-w-0 flex-1"><p className="font-semibold text-ink">{m.name}</p><p className="text-xs text-ink-muted">@{m.handle} · joined {m.joined}</p></div>
+                  <select value={m.role} onChange={(e) => { st.setMember(m.id, { role: e.target.value as typeof m.role }); toast(`${m.name} is now ${e.target.value}`); }} aria-label={`Role for ${m.name}`}
+                    className="rounded-lg border border-sand bg-paper px-2 py-1.5 text-sm text-ink">
+                    <option value="user">Member</option><option value="partner">Partner</option><option value="admin">Admin</option>
+                  </select>
+                  <button onClick={() => st.setMember(m.id, { status: m.status === "active" ? "suspended" : "active" })} className={pill(m.status)}>{m.status}</button>
+                </div>
+              ))
+            )}
           </div>
         </TabsContent>
 

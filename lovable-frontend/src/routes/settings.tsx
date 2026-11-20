@@ -45,13 +45,15 @@ function Settings() {
   const [toggles, setToggles] = useState<Record<string, boolean>>({ Messages: true, "Meetup reminders": true, "Thank-you notes": true, "Private account": true, "Hide activity status": false, "Only friends can message": true });
   const T = (k: string) => <Switch checked={!!toggles[k]} onCheckedChange={(v) => setToggles((t) => ({ ...t, [k]: v }))} aria-label={k} />;
   const isAdmin = session?.role === "admin";
+  const userAvatar = session?.avatar || (name ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}` : ME.avatar);
+  const friendCode = session?.friendCode || (session?.id ? `HB-${session.id.slice(0, 6).toUpperCase()}` : MY_CODE);
 
   return (
     <div className="mx-auto max-w-xl space-y-6 pb-6">
       <h1 className="text-2xl font-extrabold text-ink">Settings</h1>
       <div className="flex items-center gap-4 rounded-2xl border border-sand bg-paper-raised p-4">
-        <Avatar src={ME.avatar} size="size-14" ring="story" />
-        <div className="min-w-0 flex-1"><p className="font-semibold text-ink">{name}</p><p className="truncate text-sm text-ink-muted">{session?.email ?? ME.handle}</p></div>
+        <Avatar src={userAvatar} size="size-14" ring="story" />
+        <div className="min-w-0 flex-1"><p className="font-semibold text-ink">{name}</p><p className="truncate text-sm text-ink-muted">{session?.email || session?.friendCode || ME.handle}</p></div>
         <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${isAdmin ? "bg-stamp text-primary-foreground" : "bg-line text-ink"}`}>{isAdmin ? "Admin" : "Member"}</span>
       </div>
       {isAdmin && <Button asChild className="w-full"><Link to="/admin"><ShieldCheck /> Open admin console</Link></Button>}
@@ -66,8 +68,8 @@ function Settings() {
         <div className="px-4 py-3.5">
           <p className="text-sm font-medium text-ink">Your friend code</p>
           <div className="mt-2 flex gap-2">
-            <code className="flex-1 rounded-xl border border-dashed border-sand bg-paper px-4 py-2.5 font-mono text-lg tracking-widest text-ink">{MY_CODE}</code>
-            <Button variant="outline" onClick={() => { navigator.clipboard?.writeText(MY_CODE); toast.success("Code copied"); }}><Copy /> Copy</Button>
+            <code className="flex-1 rounded-xl border border-dashed border-sand bg-paper px-4 py-2.5 font-mono text-lg tracking-widest text-ink">{friendCode}</code>
+            <Button variant="outline" onClick={() => { navigator.clipboard?.writeText(friendCode); toast.success("Code copied"); }}><Copy /> Copy</Button>
           </div>
         </div>
         <form className="flex gap-2 px-4 py-3.5" onSubmit={(e) => { e.preventDefault(); if (code.trim().length >= 6) { addFriend(code.trim()); toast.success("Friend added"); setCode(""); } }}>
@@ -139,4 +141,3 @@ function Settings() {
     </div>
   );
 }
-
