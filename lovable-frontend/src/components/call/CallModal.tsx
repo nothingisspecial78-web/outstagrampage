@@ -10,7 +10,6 @@ import {
   Volume2,
   VolumeX,
   Maximize2,
-  Sparkles,
   ShieldCheck,
   User,
 } from "lucide-react";
@@ -119,17 +118,6 @@ export function CallModal() {
           </div>
 
           <div className="flex items-center gap-2">
-            {status === "calling" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={simulateAnswer}
-                className="border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 text-xs hidden sm:flex"
-              >
-                <Sparkles className="mr-1 size-3.5" /> Demo: Answer
-              </Button>
-            )}
-
             <Button
               variant="ghost"
               size="icon"
@@ -245,7 +233,7 @@ export function CallModal() {
                 {isConnected ? (
                   <span className="font-mono text-lg font-semibold text-emerald-400">
                     {formatDuration(duration)}
-                  </span >
+                  </span>
                 ) : (
                   <span className="animate-pulse">Calling…</span>
                 )}

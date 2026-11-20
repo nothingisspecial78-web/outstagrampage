@@ -22,6 +22,7 @@ export interface CallPeerInfo {
 export interface SignalingPayload {
   callId: string;
   chatId: string;
+  roomId?: string;
   from: CallPeerInfo;
   to?: CallPeerInfo;
   type: CallType;
@@ -123,14 +124,16 @@ export class WebRTCManager {
 
     // Handle remote tracks
     pc.ontrack = (event) => {
+      console.log("[WebRTC] ontrack received:", event.track.kind);
       if (event.streams && event.streams[0]) {
-        event.streams[0].getTracks().forEach((track) => {
-          if (!this.remoteStream?.getTracks().some((t) => t.id === track.id)) {
-            this.remoteStream?.addTrack(track);
-          }
-        });
+        this.remoteStream = event.streams[0];
       } else if (event.track) {
-        this.remoteStream?.addTrack(event.track);
+        if (!this.remoteStream) {
+          this.remoteStream = new MediaStream();
+        }
+        if (!this.remoteStream.getTracks().some((t) => t.id === event.track.id)) {
+          this.remoteStream.addTrack(event.track);
+        }
       }
       if (this.onRemoteStream && this.remoteStream) {
         this.onRemoteStream(this.remoteStream);
@@ -271,12 +274,15 @@ export class WebRTCManager {
 
   // Supabase Realtime Signaling Channel
   subscribeSignaling(
-    chatId: string,
+    channelOrChatId: string,
     onSignal: (event: string, payload: SignalingPayload) => void
   ): RealtimeChannel {
     this.unsubscribeSignaling();
 
-    const channelName = `call_${chatId}`;
+    const channelName = channelOrChatId.startsWith("call_") || channelOrChatId.startsWith("room_")
+      ? channelOrChatId
+      : `call_${channelOrChatId}`;
+
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
@@ -316,6 +322,36 @@ export class WebRTCManager {
       });
     } catch (err) {
       console.warn(`[WebRTC] Error sending signal ${event}:`, err);
+    }
+  }
+
+  // Send signal to arbitrary target channel (e.g. direct user invite)
+  async sendSignalToChannel(channelName: string, event: string, payload: SignalingPayload): Promise<void> {
+    try {
+      const tempChannel = supabase.channel(channelName, {
+        config: { broadcast: { self: false } },
+      });
+      tempChannel.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          try {
+            await tempChannel.send({
+              type: "broadcast",
+              event,
+              payload,
+            });
+          } catch (e) {
+            console.warn(`[WebRTC] send error to ${channelName}:`, e);
+          } finally {
+            setTimeout(() => {
+              try {
+                supabase.removeChannel(tempChannel);
+              } catch {}
+            }, 1000);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn(`[WebRTC] Error dispatching signal to channel ${channelName}:`, err);
     }
   }
 
