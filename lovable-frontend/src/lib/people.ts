@@ -6,6 +6,7 @@ export type Person = {
   name: string;
   avatar: string;
   friendCode?: string;
+  bio?: string;
 };
 
 const av = (n: number) => `https://i.pravatar.cc/150?img=${n}`;
@@ -13,14 +14,14 @@ export const ME: Person = { handle: "user", name: "You", avatar: av(12) };
 
 // Fallback demo references (only used if explicitly in isolated demo mode)
 export const DEMO_PEOPLE: Person[] = [
-  { id: "demo-maya", handle: "maya.walks", name: "Maya Lin", avatar: av(5), friendCode: "318492" },
-  { id: "demo-jonas", handle: "jonas.reads", name: "Jonas Berg", avatar: av(11), friendCode: "492015" },
-  { id: "demo-priya", handle: "priya.outside", name: "Priya Nair", avatar: av(9), friendCode: "820147" },
+  { id: "demo-maya", handle: "maya.walks", name: "Maya Lin", avatar: av(5), friendCode: "318492", bio: "Walks first, coffee second." },
+  { id: "demo-jonas", handle: "jonas.reads", name: "Jonas Berg", avatar: av(11), friendCode: "492015", bio: "Reads on benches. Returns books late." },
+  { id: "demo-priya", handle: "priya.outside", name: "Priya Nair", avatar: av(9), friendCode: "820147", bio: "Always outside, usually in a park." },
 ];
 
-export const PEOPLE: Person[] = DEMO_PEOPLE;
+export const PEOPLE: Person[] = [];
 export const SUGGESTED: Person[] = [];
-export const ALL_PEOPLE: Person[] = DEMO_PEOPLE;
+export const ALL_PEOPLE: Person[] = [];
 
 // Memory cache of real registered users across sessions
 let cachedRealUsers: Person[] = [];
@@ -68,7 +69,7 @@ export async function searchRealUsers(q: string, excludeId?: string): Promise<Pe
   try {
     let queryBuilder = supabase
       .from("profiles")
-      .select("id, display_name, username, friend_code, created_at")
+      .select("id, display_name, username, friend_code, avatar_url, bio, created_at")
       .limit(40);
 
     if (query) {
@@ -84,7 +85,8 @@ export async function searchRealUsers(q: string, excludeId?: string): Promise<Pe
           name: uName,
           handle: (item.username || item.friend_code || item.display_name || item.id.slice(0, 8)).toLowerCase().replace(/\s+/g, ""),
           friendCode: item.friend_code,
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(uName)}`,
+          avatar: item.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(uName)}`,
+          bio: item.bio || "Living offline first. Exploring the city with Outstagram.",
         };
       });
 
@@ -147,14 +149,14 @@ const LOCS = [
 ];
 
 export function profileFor(handle: string): Profile | undefined {
-  const all = [...getCachedRealUsers(), ...DEMO_PEOPLE];
-  const i = all.findIndex((p) => p.handle === handle || p.id === handle);
+  const all = [...getCachedRealUsers()];
+  const i = all.findIndex((p) => p.handle === handle || p.id === handle || (p.friendCode && p.friendCode.toLowerCase() === handle.toLowerCase()));
   const p = all[i];
   if (!p) return undefined;
   const loc = LOCS[i % LOCS.length]!;
   return {
     ...p,
-    bio: BIOS[i % BIOS.length]!,
+    bio: p.bio || BIOS[i % BIOS.length]!,
     location: loc,
     hours: 6 + ((i * 7) % 30) + 0.5,
     code: p.friendCode || String(100000 + ((i + 1) * 137911) % 900000),

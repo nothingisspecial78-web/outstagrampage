@@ -51,7 +51,7 @@ const initialStamps: Stamp[] = [];
 const initialCrafts: Craft[] = [];
 
 export type Role = "user" | "admin";
-export type Session = { id?: string; name: string; email: string; role: Role; friendCode?: string; avatar?: string };
+export type Session = { id?: string; name: string; email: string; role: Role; friendCode?: string; avatar?: string; bio?: string };
 export type Report = { id: string; what: string; by: string; reason: string; status: "open" | "kept" | "removed" };
 export type Offer = { id: string; place: string; partner: string; text: string; status: "pending" | "live" | "rejected" };
 export type Member = { id: string; name: string; handle: string; role: Role | "partner"; status: "active" | "suspended"; joined: string };
@@ -101,12 +101,18 @@ function useStoreState() {
 
   useEffect(() => {
     try {
+      localStorage.removeItem("os-chats"); // Clear any legacy un-scoped mock chats
       const d = localStorage.getItem("os-demo");
       if (d !== null) setDemo(d === "1");
-      const c = localStorage.getItem("os-chats");
-      if (c) setChats(JSON.parse(c));
       const s = localStorage.getItem("os-session");
-      if (s) setSessionState(JSON.parse(s));
+      if (s) {
+        const parsed: Session = JSON.parse(s);
+        setSessionState(parsed);
+        if (parsed?.id) {
+          const userChats = localStorage.getItem(`os-chats_${parsed.id}`);
+          if (userChats) setChats(JSON.parse(userChats));
+        }
+      }
       const f = localStorage.getItem("os-friends");
       if (f) setFriends(JSON.parse(f));
     } catch {}
@@ -119,18 +125,22 @@ function useStoreState() {
         let displayName = u.user_metadata?.display_name || u.user_metadata?.username || u.email?.split("@")[0] || "Member";
         let userRole: Role = u.email === "nothingisspecial78@gmail.com" ? "admin" : "user";
         let friendCode: string | undefined = undefined;
+        let avatarUrl: string | undefined = u.user_metadata?.avatar_url;
+        let bioText: string | undefined = u.user_metadata?.bio;
 
         try {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("id, display_name, friend_code, role")
+            .select("id, display_name, username, friend_code, role, avatar_url, bio")
             .eq("id", u.id)
             .maybeSingle();
 
           if (profile) {
-            if (profile.display_name) displayName = profile.display_name;
+            if (profile.username || profile.display_name) displayName = profile.username || profile.display_name;
             if (profile.friend_code) friendCode = profile.friend_code;
             if (profile.role === "admin" || u.email === "nothingisspecial78@gmail.com") userRole = "admin";
+            if (profile.avatar_url) avatarUrl = profile.avatar_url;
+            if (profile.bio) bioText = profile.bio;
           }
         } catch {}
 
@@ -140,7 +150,8 @@ function useStoreState() {
           name: displayName,
           role: userRole,
           friendCode,
-          avatar: u.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+          avatar: avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+          bio: bioText,
         });
       }
     });
@@ -282,7 +293,14 @@ function useStoreState() {
   }, [session?.id, session?.email, session?.friendCode, session?.name]);
 
   useEffect(() => { if (ready) { try { localStorage.setItem("os-demo", demo ? "1" : "0"); } catch {} } }, [demo, ready]);
-  useEffect(() => { if (ready) { try { localStorage.setItem("os-chats", JSON.stringify(chats)); } catch {} } }, [chats, ready]);
+  useEffect(() => {
+    if (ready) {
+      try {
+        const key = session?.id ? `os-chats_${session.id}` : (demo ? "os-chats_guest" : null);
+        if (key) localStorage.setItem(key, JSON.stringify(chats));
+      } catch {}
+    }
+  }, [chats, ready, session?.id, demo]);
   useEffect(() => { if (ready) { try { localStorage.setItem("os-friends", JSON.stringify(friends)); } catch {} } }, [friends, ready]);
 
   const setSession = (s: Session | null) => {
@@ -290,18 +308,34 @@ function useStoreState() {
     try { s ? localStorage.setItem("os-session", JSON.stringify(s)) : localStorage.removeItem("os-session"); } catch {}
   };
 
-  const signIn = (email: string, role: Role, name?: string, id?: string, friendCode?: string, avatar?: string) => {
+  const signIn = (email: string, role: Role, name?: string, id?: string, friendCode?: string, avatar?: string, bio?: string) => {
+    const userId = id || email;
     setSession({
-      id: id || email,
+      id: userId,
       email,
       role,
       name: name || (role === "admin" ? "Admin" : email.split("@")[0]),
       friendCode,
       avatar,
+      bio,
     });
+    try {
+      const stored = localStorage.getItem(`os-chats_${userId}`);
+      setChats(stored ? JSON.parse(stored) : []);
+    } catch {
+      setChats([]);
+    }
   };
 
-  const signOut = () => setSession(null);
+  const signOut = () => {
+    setSession(null);
+    setChats([]);
+    setDemo(false);
+    try {
+      localStorage.removeItem("os-session");
+      localStorage.setItem("os-demo", "0");
+    } catch {}
+  };
 
   const addStamp = (kind: Stamp["kind"], label: string) =>
     setStamps((s) => [{ id: `s_${Date.now()}`, kind, label, date: today() }, ...s]);

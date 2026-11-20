@@ -161,7 +161,7 @@ function Shell() {
     if (ready && !session && !isPublic) navigate({ to: "/login", replace: true });
   }, [ready, session, isPublic, navigate]);
 
-  if (!session && isPublic) {
+  if (isPublic) {
     return (
       <div className="min-h-screen bg-paper">
         <Outlet />
