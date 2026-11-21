@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useStore } from "@/lib/store";
 import { ME, searchRealUsers, getCachedRealUsers, type Person } from "@/lib/people";
 import { cn } from "@/lib/utils";
+import { OutstagramIcon } from "./OutstagramLogo";
 
 export function Wordmark({ className }: { className?: string }) {
   return <span className={cn("font-logo text-3xl leading-none text-ink", className)}>Outstagram</span>;
@@ -66,38 +67,149 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dot = !seenNotes && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-badge ring-2 ring-paper-raised" />;
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-paper-raised">
-      {demo && <div role="status" className="sticky top-0 z-50 bg-demo py-1.5 text-center text-xs font-bold tracking-widest text-demo-foreground">DEMO MODE: location check simulated</div>}
+    <div className="min-h-screen w-full max-w-full bg-paper-raised">
+      {demo && <div role="status" className="fixed top-0 inset-x-0 z-50 bg-demo py-1 text-center text-xs font-bold tracking-widest text-demo-foreground">DEMO MODE: location check simulated</div>}
 
-      {/* Desktop / tablet rail */}
-      <aside className={cn("fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-sand bg-paper-raised px-3 pt-8 pb-5 md:flex md:w-[72px] xl:w-[244px]", collapsed && "xl:w-[72px]")}>
-        <Link to="/" className="mb-6 px-3 pb-4" aria-label="Outstagram home">
-          <Instagram className={cn("size-6 xl:hidden", collapsed && "xl:block")} />
-          <Wordmark className={cn("hidden text-[28px] xl:block", collapsed && "xl:hidden")} />
-        </Link>
-        <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
+      {/* Constant Universal Top Bar (Always fixed and constant on all screens) */}
+      <header className={cn(
+        "fixed inset-x-0 top-0 z-40 flex h-14 md:h-16 w-full items-center justify-between border-b border-sand bg-paper-raised/95 px-3 sm:px-6 backdrop-blur-md shadow-xs select-none",
+        demo && "top-6"
+      )}>
+        {/* Left: Brand Logo & Hours reclaimed */}
+        <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-2.5 transition-transform hover:scale-[1.02] active:scale-95" aria-label="Outstagram Home">
+            <OutstagramIcon size={30} />
+            <Wordmark className="text-2xl md:text-3xl text-ink" />
+          </Link>
+          <div className="hidden lg:block ml-2">
+            <HoursChip />
+          </div>
+        </div>
+
+        {/* Center: Search button / Quick find */}
+        <div className="hidden sm:flex items-center flex-1 max-w-xs md:max-w-sm mx-4">
+          <button
+            type="button"
+            onClick={() => toggle("search")}
+            className="flex items-center gap-2.5 w-full rounded-full border border-sand bg-paper px-3.5 py-1.5 text-xs text-ink-muted hover:border-stamp/60 hover:text-ink transition-all shadow-xs cursor-pointer text-left"
+          >
+            <Search className="size-3.5 shrink-0 text-ink-muted" />
+            <span className="truncate">Search registered members…</span>
+            <kbd className="hidden md:inline-block ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-sand/30 text-ink-muted">⌘K</kbd>
+          </button>
+        </div>
+
+        {/* Right: Quick Actions, Notifications, Messages, User Profile */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Mobile search toggle */}
+          <button
+            type="button"
+            onClick={() => toggle("search")}
+            aria-label="Search"
+            className="sm:hidden flex items-center justify-center size-9 rounded-full text-ink hover:bg-line active:scale-95 cursor-pointer"
+          >
+            <Search className="size-5" />
+          </button>
+
+          {/* Group Meetups Link */}
+          <Link
+            to="/group"
+            aria-label="Group meetups"
+            className="flex items-center justify-center size-9 rounded-full text-ink hover:bg-line hover:text-stamp-ink transition-colors cursor-pointer"
+          >
+            <Users className="size-5" />
+          </Link>
+
+          {/* Messages Link with live badge */}
+          <Link
+            to="/chats"
+            aria-label="Messages"
+            className="relative flex items-center justify-center size-9 rounded-full text-ink hover:bg-line hover:text-stamp-ink transition-colors cursor-pointer"
+          >
+            <Send className="size-5" />
+            {badge}
+          </Link>
+
+          {/* Admin console link if user is admin */}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              aria-label="Admin console"
+              className="flex items-center justify-center size-9 rounded-full text-stamp-ink hover:bg-stamp-soft transition-colors cursor-pointer"
+            >
+              <ShieldCheck className="size-5" />
+            </Link>
+          )}
+
+          {/* Profile Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="outline-none flex items-center justify-center p-0.5 cursor-pointer">
+              <Avatar src={myAvatar} size="size-8" ring={isPassportActive ? "story" : undefined} className="hover:ring-2 hover:ring-stamp transition-all" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="bottom" align="end" className="w-56 rounded-2xl border-sand bg-paper-raised p-2 shadow-postcard">
+              <div className="px-3 py-2 border-b border-sand mb-1">
+                <p className="font-bold text-sm text-ink truncate">{session?.name || "Member"}</p>
+                <p className="text-xs text-ink-muted truncate">{session?.email || ""}</p>
+              </div>
+              <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs font-semibold cursor-pointer">
+                <Link to="/passport" search={{ tab: "stamps" }}><Avatar src={myAvatar} size="size-4" className="mr-2" />My Passport & Stamps</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs font-semibold cursor-pointer">
+                <Link to="/passport" search={{ tab: "rewards" }}><Gift className="size-4 mr-2 text-stamp" />Rewards & Points</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs font-semibold cursor-pointer">
+                <Link to="/group"><Users className="size-4 mr-2 text-moss" />Group Goals & Points</Link>
+              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs font-bold text-stamp-ink cursor-pointer">
+                  <Link to="/admin"><ShieldCheck className="size-4 mr-2" />Admin Console</Link>
+                </DropdownMenuItem>
+              )}
+              <div className="my-1 border-t border-sand" />
+              <DropdownMenuItem asChild className="rounded-lg p-2 text-xs text-ink-muted cursor-pointer">
+                <Link to="/about"><Compass className="size-3.5 mr-2" />About Outstagram</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="rounded-lg p-2 text-xs text-ink-muted cursor-pointer">
+                <Link to="/terms"><FileText className="size-3.5 mr-2" />Terms of Service</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="rounded-lg p-2 text-xs text-ink-muted cursor-pointer">
+                <Link to="/privacy"><Lock className="size-3.5 mr-2" />Privacy Policy</Link>
+              </DropdownMenuItem>
+              <div className="my-1 border-t border-sand" />
+              <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-2 text-xs font-semibold text-rose-600 cursor-pointer">
+                <LogOut className="size-3.5 mr-2" />Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Mobile slide drawer button */}
+          <button
+            type="button"
+            onClick={() => toggle("menu")}
+            aria-label="Open menu"
+            className="md:hidden flex items-center justify-center size-9 rounded-full text-ink hover:bg-line active:scale-95 cursor-pointer"
+          >
+            <Menu className="size-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Desktop / tablet side rail (neatly starts right under the constant top bar) */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sand bg-paper-raised px-3 pb-5 md:flex md:w-[72px] xl:w-[244px]",
+        demo ? "top-20" : "top-14 md:top-16",
+        collapsed && "xl:w-[72px]"
+      )}>
+        <nav className="flex flex-1 flex-col gap-1 pt-4" aria-label="Main">
           <Link to="/" className="group" onClick={() => setPanel(null)}>{item("Home", <Home className={cn("size-6", on("/") && "fill-ink")} />, on("/"))}</Link>
           <Link to="/rack" className="group" onClick={() => setPanel(null)}>{item("Rack", <Clapperboard className="size-6" />, on("/rack"))}</Link>
           <Link to="/chats" className="group" onClick={() => setPanel(null)}>{item("Messages", <Send className="size-6" />, on("/chats"), badge)}</Link>
           <button className="group text-left" onClick={() => toggle("search")}>{item("Search", <Search className="size-6" />, panel === "search")}</button>
           <Link to="/capture" className="group" onClick={() => setPanel(null)}>{item("Create", <PlusSquare className="size-6" />, on("/capture"))}</Link>
+          <Link to="/group" className="group" onClick={() => setPanel(null)}>{item("Groups", <Users className="size-6" />, on("/group"))}</Link>
           <Link to="/passport" search={{ tab: "rewards" }} className="group" onClick={() => setPanel(null)}>{item("Rewards", <Gift className={cn("size-6", isRewardsActive && "text-stamp stroke-[2.5]")} />, isRewardsActive)}</Link>
           <Link to="/passport" search={{ tab: "stamps" }} className="group" onClick={() => setPanel(null)}>{item("Passport", <Avatar src={myAvatar} size="size-6" className={cn(isPassportActive && "rounded-full ring-2 ring-ink")} />, isPassportActive)}</Link>
           <div className="mt-auto flex flex-col gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="group text-left outline-none">{item("More", <Menu className="size-6" />, false)}</DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-64 rounded-2xl border-sand bg-paper-raised p-2 shadow-postcard">
-                {MORE.map((m) => (
-                  <DropdownMenuItem key={m.to} asChild className="rounded-lg p-3"><Link to={m.to}><m.icon className="size-5" />{m.label}</Link></DropdownMenuItem>
-                ))}
-                {isAdmin && <DropdownMenuItem asChild className="rounded-lg p-3 font-semibold text-stamp-ink"><Link to="/admin"><ShieldCheck className="size-5" />Admin console</Link></DropdownMenuItem>}
-                <div className="my-1 border-t border-sand" />
-                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/terms"><FileText className="size-4" />Terms of Service</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/privacy"><Lock className="size-4" />Privacy Policy</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild className="rounded-lg p-2.5 text-xs text-ink-muted hover:text-ink"><Link to="/about"><Compass className="size-4" />About Outstagram (Our Story)</Link></DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => { signOut(); navigate({ to: "/login" }); }} className="rounded-lg p-3"><LogOut className="size-5" />Log out {session?.name ? session.name.split(" ")[0] : ""}</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             <Link to="/meet" className="group">{item("From Hereabouts", <LayoutGrid className="size-6" />, false)}</Link>
           </div>
         </nav>
@@ -286,56 +398,54 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex h-[60px] w-full max-w-full items-center justify-between border-b border-sand bg-paper-raised px-4 md:hidden">
-        <Link to="/"><Wordmark className="text-[30px]" /></Link>
-        <div className="flex items-center gap-3">
-          {isAdmin && <Link to="/admin" aria-label="Admin console" className="flex items-center justify-center min-h-[44px] min-w-[44px] text-stamp-ink"><ShieldCheck className="size-6" /></Link>}
-          <button
-            type="button"
-            onClick={() => toggle("menu")}
-            aria-label="Open menu"
-            aria-expanded={panel === "menu"}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-ink transition-colors hover:bg-line active:scale-95 cursor-pointer touch-manipulation select-none"
-          >
-            <Menu className="size-6 stroke-[2.2]" />
-          </button>
-          <Link to="/chats" aria-label="Messages" className="relative flex items-center justify-center min-h-[44px] min-w-[44px]"><Send className="size-6" />{badge}</Link>
-        </div>
-      </header>
-
-      <main className={cn("w-full max-w-full overflow-x-hidden md:pl-[72px] xl:pl-[244px]", collapsed && "xl:pl-[244px]")}>
-        <div className={cn("mx-auto w-full max-w-[960px] pb-20 md:pt-6 md:pb-10", path === "/" ? "px-0 sm:px-4" : "px-4 pt-5 sm:px-6")}>
-          {children}
-          <footer className="mt-16 border-t border-sand/60 pt-6 pb-4 text-center text-xs text-ink-muted">
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-              <Link to="/about" className="hover:text-ink transition-colors underline-offset-2 hover:underline">About</Link>
+      <main className={cn(
+        "w-full max-w-full overflow-x-hidden pt-14 md:pt-16 md:pl-[72px] xl:pl-[244px]",
+        collapsed && "xl:pl-[72px]"
+      )}>
+        {path.startsWith("/chats") ? (
+          <div className={cn(
+            "w-full overflow-hidden",
+            path.match(/^\/chats\/[^/]+/)
+              ? "h-[calc(100dvh-3.5rem)] md:h-[calc(100dvh-4rem)]"
+              : "h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-4rem)]"
+          )}>
+            {children}
+          </div>
+        ) : (
+          <div className={cn("mx-auto w-full max-w-5xl pb-24 md:pb-12", path === "/" ? "px-3 sm:px-6 pt-3 md:pt-6" : "px-4 pt-5 sm:px-6")}>
+            {children}
+            <footer className="mt-16 border-t border-sand/60 pt-6 pb-4 text-center text-xs text-ink-muted">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+                <Link to="/about" className="hover:text-ink transition-colors underline-offset-2 hover:underline">About</Link>
                 <span>•</span>
                 <Link to="/terms" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Terms of Service</Link>
-              <span>·</span>
-              <Link to="/privacy" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Privacy Policy</Link>
-              <span>·</span>
-              <Link to="/places" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Places</Link>
-              <span>·</span>
-              <Link to="/passport" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Rewards & Stamps</Link>
-              <span>·</span>
-              <span>Outstagram © 2026</span>
-            </div>
-            <p className="mt-1.5 text-[11px] text-ink-muted/70">Anti-algorithm · Pro-presence · Zero tracking ads</p>
-          </footer>
-        </div>
+                <span>·</span>
+                <Link to="/privacy" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Privacy Policy</Link>
+                <span>·</span>
+                <Link to="/places" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Places</Link>
+                <span>·</span>
+                <Link to="/passport" className="hover:text-ink transition-colors underline-offset-2 hover:underline">Rewards & Stamps</Link>
+                <span>·</span>
+                <span>Outstagram © 2026</span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-ink-muted/70">Anti-algorithm · Pro-presence · Zero tracking ads</p>
+            </footer>
+          </div>
+        )}
       </main>
 
-      {/* Mobile bottom nav */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 w-full max-w-full border-t border-sand bg-paper-raised pb-[env(safe-area-inset-bottom)] md:hidden">
-        <ul className="grid h-12 grid-cols-5 place-items-center">
-          <li><Link to="/" aria-label="Home" onClick={() => setPanel(null)}><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
-          <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
-          <li><Link to="/capture" aria-label="Capture" className="-mt-5 grid size-12 place-items-center rounded-full bg-stamp text-primary-foreground shadow-postcard"><PlusSquare className="size-6" /></Link></li>
-          <li><Link to="/passport" search={{ tab: "rewards" }} aria-label="Rewards" onClick={() => setPanel(null)}><Gift className={cn("size-6 transition-all", isRewardsActive ? "stroke-[2.5] text-stamp" : "text-ink")} /></Link></li>
-          <li><Link to="/passport" search={{ tab: "stamps" }} aria-label="Passport" onClick={() => setPanel(null)}><Avatar src={myAvatar} size="size-6" className={cn("rounded-full transition-all", isPassportActive && "ring-2 ring-ink")} /></Link></li>
-        </ul>
-      </nav>
+      {/* Mobile bottom nav - hidden when inside an active conversation thread so typing area is pinned and fully visible */}
+      {!path.match(/^\/chats\/[^/]+/) && (
+        <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 w-full max-w-full border-t border-sand bg-paper-raised pb-[env(safe-area-inset-bottom)] md:hidden shadow-lg">
+          <ul className="grid h-12 grid-cols-5 place-items-center">
+            <li><Link to="/" aria-label="Home" onClick={() => setPanel(null)}><Home className={cn("size-6", on("/") && "fill-ink")} /></Link></li>
+            <li><Link to="/rack" aria-label="Rack"><Clapperboard className={cn("size-6", on("/rack") && "stroke-[3]")} /></Link></li>
+            <li><Link to="/capture" aria-label="Capture" className="-mt-5 grid size-12 place-items-center rounded-full bg-stamp text-primary-foreground shadow-postcard"><PlusSquare className="size-6" /></Link></li>
+            <li><Link to="/passport" search={{ tab: "rewards" }} aria-label="Rewards" onClick={() => setPanel(null)}><Gift className={cn("size-6 transition-all", isRewardsActive ? "stroke-[2.5] text-stamp" : "text-ink")} /></Link></li>
+            <li><Link to="/passport" search={{ tab: "stamps" }} aria-label="Passport" onClick={() => setPanel(null)}><Avatar src={myAvatar} size="size-6" className={cn("rounded-full transition-all", isPassportActive && "ring-2 ring-ink")} /></Link></li>
+          </ul>
+        </nav>
+      )}
     </div>
   );
 }
