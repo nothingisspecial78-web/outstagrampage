@@ -69,6 +69,24 @@ export function AntiScreenshotGuard() {
       }
     };
 
+    // 4. Prevent dragging images or media to desktop
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    // 5. Blur veil when external screenshot or screen snipping tool steals focus
+    const handleWindowBlur = () => {
+      setBlurred(true);
+      setAlertVisible(true);
+    };
+
+    const handleWindowFocus = () => {
+      setTimeout(() => {
+        setBlurred(false);
+        setAlertVisible(false);
+      }, 400);
+    };
+
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", (e) => {
       if (e.key === "PrintScreen" || e.code === "PrintScreen") {
@@ -77,11 +95,17 @@ export function AntiScreenshotGuard() {
     });
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("dragstart", handleDragStart);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("dragstart", handleDragStart);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, []);
 
