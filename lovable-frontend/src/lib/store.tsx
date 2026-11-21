@@ -76,6 +76,7 @@ function today() {
 
 function useStoreState() {
   const [hours, setHours] = useState(12.5);
+  const [points, setPoints] = useState(350);
   const [questDone, setQuestDone] = useState(false);
   const [seen, setSeenState] = useState(0);
   const [rack, setRack] = useState<Postcard[]>(RACK);
@@ -131,7 +132,7 @@ function useStoreState() {
         try {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("id, display_name, username, friend_code, role, avatar_url, bio")
+            .select("id, display_name, username, friend_code, role, avatar_url, bio, points")
             .eq("id", u.id)
             .maybeSingle();
 
@@ -141,6 +142,7 @@ function useStoreState() {
             if (profile.role === "admin" || u.email === "nothingisspecial78@gmail.com") userRole = "admin";
             if (profile.avatar_url) avatarUrl = profile.avatar_url;
             if (profile.bio) bioText = profile.bio;
+            if (typeof profile.points === "number") setPoints(profile.points);
           }
         } catch {}
 
@@ -172,22 +174,61 @@ function useStoreState() {
       console.warn("Supabase initial sync fallback:", err);
     });
 
-    // Also fetch live postcards from Supabase
+    // Fetch live shared community postcards from Supabase
     Promise.resolve(
-      supabase.from('postcards').select('*').order('taken_at', { ascending: false }).limit(10)
+      supabase
+        .from('postcards')
+        .select('id, image_path, caption, taken_at, author_id, profiles(display_name, username, avatar_url), places(name)')
+        .order('taken_at', { ascending: false })
+        .limit(30)
     ).then(({ data }: any) => {
       if (data && data.length > 0) {
         const liveCards: Postcard[] = data.map((p: any) => ({
           id: p.id,
-          from: "You",
-          place: "Riverside Cafe",
-          date: "TODAY",
+          from: p.profiles?.username || p.profiles?.display_name || "Community Member",
+          place: p.places?.name || "Outdoors",
+          date: new Date(p.taken_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }).toUpperCase(),
           img: p.image_path || cafe,
           caption: p.caption,
         }));
-        setRack((existing) => [...liveCards, ...existing]);
+        setRack((existing) => {
+          const ids = new Set(liveCards.map((c) => c.id));
+          return [...liveCards, ...existing.filter((c) => !ids.has(c.id))];
+        });
       }
     }).catch(() => {});
+
+    // Real-time listener for newly shared postcards across all accounts
+    const postcardSubName = `public_postcards_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const postcardSub = supabase
+      .channel(postcardSubName)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'postcards' }, async (payload: any) => {
+        const row = payload.new;
+        if (!row) return;
+        let authorName = "Community Member";
+        let placeName = "Outdoors";
+        try {
+          if (row.author_id) {
+            const { data: prof } = await supabase.from('profiles').select('username, display_name').eq('id', row.author_id).maybeSingle();
+            if (prof) authorName = prof.username || prof.display_name || authorName;
+          }
+          if (row.place_id) {
+            const { data: pl } = await supabase.from('places').select('name').eq('id', row.place_id).maybeSingle();
+            if (pl) placeName = pl.name || placeName;
+          }
+        } catch {}
+
+        const newPost: Postcard = {
+          id: row.id,
+          from: authorName,
+          place: placeName,
+          date: 'TODAY',
+          img: row.image_path,
+          caption: row.caption,
+        };
+        setRack((prev) => [newPost, ...prev.filter((c) => c.id !== newPost.id)]);
+      })
+      .subscribe();
 
     // Fetch live registered members from Supabase profiles
     Promise.resolve(
@@ -210,19 +251,156 @@ function useStoreState() {
 
     return () => {
       authListener?.subscription?.unsubscribe();
+      try {
+        supabase.removeChannel(postcardSub);
+      } catch {}
     };
   }, []);
 
-  // Listen for real-time incoming chat messages across users
+  // Listen for real-time incoming chat messages and load persistent history across users
   useEffect(() => {
+    if (!session?.id && !session?.name && !session?.email) return;
+
+    const myId = session.id || "";
+    const myName = (session.name || "").toLowerCase();
+    const myEmail = (session.email || "").toLowerCase();
+
+    // 1. Initial Load of past Direct Messages from Supabase
+    supabase
+      .from("direct_messages")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .then(({ data }: any) => {
+        if (!data || data.length === 0) return;
+        const relevant = data.filter((m: any) => {
+          const recId = (m.receiver_id || "").toLowerCase();
+          const sndId = (m.sender_id || "").toLowerCase();
+          const recName = (m.receiver_name || "").toLowerCase();
+          const sndName = (m.sender_name || "").toLowerCase();
+          return (
+            recId === myId.toLowerCase() ||
+            sndId === myId.toLowerCase() ||
+            (myEmail && (recId === myEmail || sndId === myEmail)) ||
+            (myName && (recName === myName || sndName === myName))
+          );
+        });
+
+        if (relevant.length > 0) {
+          setChats((prev) => {
+            const updated = [...prev];
+            relevant.forEach((row: any) => {
+              const isMine =
+                row.sender_id === myId ||
+                row.sender_id === myEmail ||
+                (myName && row.sender_name?.toLowerCase() === myName);
+              const peerId = isMine ? row.receiver_id : row.sender_id;
+              const peerName = isMine ? row.receiver_name : row.sender_name;
+              const peerAvatar = isMine ? undefined : row.sender_avatar;
+
+              const msg: Msg = {
+                id: row.id,
+                mine: isMine,
+                text: row.body || "",
+                audioUrl: row.audio_url,
+                audioDuration: row.audio_duration,
+                postcard: row.postcard,
+              };
+
+              let chat = updated.find(
+                (c) => c.peerId === peerId || c.name.toLowerCase() === peerName.toLowerCase() || c.id === peerId
+              );
+              if (chat) {
+                if (!chat.messages.some((m) => m.id === msg.id)) {
+                  chat.messages.push(msg);
+                }
+              } else {
+                updated.push({
+                  id: peerId,
+                  peerId,
+                  peerAvatar,
+                  name: peerName,
+                  place: "Outdoors",
+                  limit: MESSAGE_LIMIT_STEP,
+                  messages: [msg],
+                });
+              }
+            });
+            return updated;
+          });
+        }
+      })
+      .catch((err) => console.warn("Could not load direct messages:", err));
+
+    // 2. Real-time PostgreSQL changes listener on direct_messages table
+    const dmChannelName = `dm_global_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const dmPostgresSub = supabase
+      .channel(dmChannelName)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, (payload: any) => {
+        const row = payload.new;
+        if (!row) return;
+
+        if (row.sender_id === myId || (myEmail && row.sender_id === myEmail)) return;
+
+        const recId = (row.receiver_id || "").toLowerCase();
+        const recName = (row.receiver_name || "").toLowerCase();
+        const isForMe =
+          recId === myId.toLowerCase() ||
+          (myEmail && recId === myEmail) ||
+          (myName && recName === myName);
+
+        if (!isForMe) return;
+
+        const incomingMsg: Msg = {
+          id: row.id,
+          mine: false,
+          text: row.body || "",
+          audioUrl: row.audio_url,
+          audioDuration: row.audio_duration,
+          postcard: row.postcard,
+        };
+
+        const peerId = row.sender_id;
+        const peerName = row.sender_name || "Friend";
+
+        setChats((prev) => {
+          const existing = prev.find(
+            (c) => c.peerId === peerId || c.name.toLowerCase() === peerName.toLowerCase() || c.id === peerId
+          );
+          if (existing) {
+            return prev.map((c) =>
+              c.id === existing.id
+                ? {
+                    ...c,
+                    messages: [...c.messages.filter((m) => m.id !== incomingMsg.id), incomingMsg],
+                    peerAvatar: row.sender_avatar || c.peerAvatar,
+                  }
+                : c
+            );
+          } else {
+            return [
+              ...prev,
+              {
+                id: peerId,
+                peerId,
+                peerAvatar: row.sender_avatar,
+                name: peerName,
+                place: "Nearby",
+                limit: MESSAGE_LIMIT_STEP,
+                messages: [incomingMsg],
+              },
+            ];
+          }
+        });
+      })
+      .subscribe();
+
+    // 3. Ephemeral Broadcast channels listener
     const rawIds = [
       session?.id,
       session?.email,
       session?.friendCode,
       session?.name,
     ].filter(Boolean) as string[];
-
-    if (rawIds.length === 0) return;
 
     const uniqueClean = Array.from(
       new Set(rawIds.map((id) => id.replace(/[^a-zA-Z0-9_-]/g, "_")))
@@ -259,7 +437,7 @@ function useStoreState() {
               c.id === existing.id
                 ? {
                     ...c,
-                    messages: [...c.messages, incomingMsg],
+                    messages: [...c.messages.filter((m) => m.id !== incomingMsg.id), incomingMsg],
                     peerAvatar: payload.senderAvatar || c.peerAvatar,
                   }
                 : c
@@ -284,6 +462,9 @@ function useStoreState() {
     });
 
     return () => {
+      try {
+        supabase.removeChannel(dmPostgresSub);
+      } catch {}
       channels.forEach((ch) => {
         try {
           supabase.removeChannel(ch);
@@ -340,9 +521,41 @@ function useStoreState() {
   const addStamp = (kind: Stamp["kind"], label: string) =>
     setStamps((s) => [{ id: `s_${Date.now()}`, kind, label, date: today() }, ...s]);
 
-  const addPostcard = (pc: Postcard) => {
-    setRack((r) => [pc, ...r]);
+  const addPoints = async (amount: number, reason?: string) => {
+    setPoints((p) => {
+      const next = p + amount;
+      if (session?.id) {
+        supabase
+          .from("profiles")
+          .update({ points: next })
+          .eq("id", session.id)
+          .then(() => {})
+          .catch(() => {});
+      }
+      return next;
+    });
+    if (reason) {
+      addStamp("meetup", `${reason} (+${amount} pts)`);
+    }
+  };
+
+  const addPostcard = async (pc: Postcard) => {
+    setRack((r) => [pc, ...r.filter((x) => x.id !== pc.id)]);
     addStamp("place", pc.place);
+
+    try {
+      const authorId = session?.id || "33333333-3333-3333-3333-333333333301";
+      await supabase.from("postcards").insert({
+        id: pc.id,
+        author_id: authorId,
+        place_id: "22222222-2222-2222-2222-222222222201",
+        image_path: pc.img,
+        caption: pc.caption,
+        is_demo: false,
+      });
+    } catch (err) {
+      console.warn("Could not save postcard to Supabase:", err);
+    }
   };
 
   const logQuest = (reflection: string, minutes: number = 30) => {
@@ -391,7 +604,26 @@ function useStoreState() {
     );
 
     const targetChat = chats.find((c) => c.id === chatId);
-    const targetPeerId = (targetChat?.peerId || chatId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const targetReceiverId = targetChat?.peerId || chatId;
+    const targetReceiverName = targetChat?.name || "Friend";
+
+    // Insert into Supabase direct_messages table for persistent cross-account chat
+    supabase
+      .from("direct_messages")
+      .insert({
+        sender_id: session?.id || session?.email || "self",
+        sender_name: session?.name || "Member",
+        sender_avatar: session?.avatar,
+        receiver_id: targetReceiverId,
+        receiver_name: targetReceiverName,
+        body: text,
+      })
+      .then(({ error }: any) => {
+        if (error) console.warn("direct_messages insert error:", error);
+      })
+      .catch(() => {});
+
+    const targetPeerId = targetReceiverId.replace(/[^a-zA-Z0-9_-]/g, "_");
     try {
       const ch = supabase.channel(`user_chat_${targetPeerId}`, { config: { broadcast: { self: false } } });
       ch.subscribe(async (status) => {
@@ -443,7 +675,28 @@ function useStoreState() {
     );
 
     const targetChat = chats.find((c) => c.id === chatId);
-    const targetPeerId = (targetChat?.peerId || chatId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const targetReceiverId = targetChat?.peerId || chatId;
+    const targetReceiverName = targetChat?.name || "Friend";
+
+    // Insert voice into direct_messages table
+    supabase
+      .from("direct_messages")
+      .insert({
+        sender_id: session?.id || session?.email || "self",
+        sender_name: session?.name || "Member",
+        sender_avatar: session?.avatar,
+        receiver_id: targetReceiverId,
+        receiver_name: targetReceiverName,
+        body: "Voice message",
+        audio_url: audioUrl,
+        audio_duration: duration,
+      })
+      .then(({ error }: any) => {
+        if (error) console.warn("direct_messages voice insert error:", error);
+      })
+      .catch(() => {});
+
+    const targetPeerId = targetReceiverId.replace(/[^a-zA-Z0-9_-]/g, "_");
     try {
       const ch = supabase.channel(`user_chat_${targetPeerId}`, { config: { broadcast: { self: false } } });
       ch.subscribe(async (status) => {
@@ -537,6 +790,21 @@ function useStoreState() {
       }
     });
 
+    // Also persist postcard note in direct_messages
+    supabase
+      .from("direct_messages")
+      .insert({
+        sender_id: session?.id || session?.email || "self",
+        sender_name: session?.name || "Member",
+        sender_avatar: session?.avatar,
+        receiver_id: chatId,
+        receiver_name: first,
+        body: noteText,
+        postcard: newMsg.postcard,
+      })
+      .then(() => {})
+      .catch(() => {});
+
     return chatId;
   };
 
@@ -623,7 +891,7 @@ function useStoreState() {
   const removeQuest = (q: string) => setQuests((prev) => prev.filter((x) => x !== q));
 
   return {
-    hours, questDone, seen, rack: demo ? [...rack, ...DEMO_RACK] : rack, stamps, crafts, chats, coachLeft, demo, session, ready,
+    hours, points, setPoints, addPoints, questDone, seen, rack: demo ? [...rack, ...DEMO_RACK] : rack, stamps, crafts, chats, coachLeft, demo, session, ready,
     reports, offers, members, quests,
     friends, setFriends, addFriend, addFriendName,
     dwell, setDwell, setDemo,
