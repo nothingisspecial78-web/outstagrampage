@@ -135,6 +135,73 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Request notification permissions on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  // Desktop screen notifications & title alerts for incoming calls even when minimized or backgrounded
+  useEffect(() => {
+    if (!incomingCall) return;
+
+    const callerName = incomingCall.from?.name || "Friend";
+    const callKind = incomingCall.type === "video" ? "Video" : "Voice";
+
+    let desktopNotif: Notification | null = null;
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        try {
+          desktopNotif = new Notification(`📞 Incoming ${callKind} Call — Outstagram`, {
+            body: `${callerName} is calling you. Click here to answer!`,
+            icon: "/logo.jpg",
+            badge: "/logo.jpg",
+            tag: `call_${incomingCall.callId}`,
+            requireInteraction: true,
+          });
+          desktopNotif.onclick = () => {
+            window.focus();
+            desktopNotif?.close();
+          };
+        } catch {}
+      } else if (Notification.permission === "default") {
+        Notification.requestPermission().then((perm) => {
+          if (perm === "granted") {
+            try {
+              desktopNotif = new Notification(`📞 Incoming ${callKind} Call — Outstagram`, {
+                body: `${callerName} is calling you. Click here to answer!`,
+                icon: "/logo.jpg",
+                badge: "/logo.jpg",
+                tag: `call_${incomingCall.callId}`,
+                requireInteraction: true,
+              });
+              desktopNotif.onclick = () => {
+                window.focus();
+                desktopNotif?.close();
+              };
+            } catch {}
+          }
+        }).catch(() => {});
+      }
+    }
+
+    const origTitle = document.title;
+    let flip = false;
+    const titleInterval = window.setInterval(() => {
+      document.title = flip ? `📞 (${callKind.toUpperCase()}) ${callerName} is calling...` : `🔔 INCOMING OUTSTAGRAM CALL`;
+      flip = !flip;
+    }, 750);
+
+    return () => {
+      clearInterval(titleInterval);
+      document.title = origTitle;
+      if (desktopNotif) {
+        desktopNotif.close();
+      }
+    };
+  }, [incomingCall]);
+
   // Duration counter when connected
   useEffect(() => {
     if (status === "connected") {
