@@ -7,6 +7,7 @@ import { saveRegisteredUser } from "@/lib/people";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Wordmark } from "@/components/hb/AppShell";
+import { OutstagramIcon } from "@/components/hb/OutstagramLogo";
 import friends from "@/assets/friends-walk.jpg";
 import { Postmark } from "@/components/hb/Postmark";
 import { cn } from "@/lib/utils";
@@ -582,8 +583,11 @@ function Login() {
         <div className="absolute inset-x-0 top-0 h-60 overflow-hidden rounded-b-[2.5rem] lg:hidden"><img src={friends} alt="" width={1024} height={1280} className="size-full object-cover object-[center_35%]" /><div className="absolute inset-0 bg-gradient-to-b from-transparent to-paper/70" /></div>
         <Postmark place="Go outside" date="TODAY" className="absolute top-36 right-6 size-24 rounded-full bg-paper-raised/90 lg:hidden" />
         <div className="relative">
-          <Wordmark className="relative text-3xl lg:hidden [&_*]:text-paper-raised" />
-          <h1 className="mt-40 font-serif text-3xl font-semibold text-ink lg:mt-0 lg:text-4xl">
+          <div className="mb-6 flex items-center gap-3">
+            <OutstagramIcon size={36} />
+            <Wordmark className="text-3xl text-ink" />
+          </div>
+          <h1 className="font-serif text-3xl font-semibold text-ink lg:text-4xl">
             {otpMode ? "Verify Your Account" : mode === "in" ? "Welcome Back" : "Get Started"}
           </h1>
           <p className="mt-1.5 text-sm text-ink-muted">
