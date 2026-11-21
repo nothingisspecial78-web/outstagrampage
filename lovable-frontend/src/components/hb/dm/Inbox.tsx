@@ -239,6 +239,10 @@ function Conversation({ chat }: { chat: Chat }) {
     end.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat.messages.length]);
 
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "auto" });
+  }, [chat.id]);
+
   const person = personFor(chat.name, chat.peerId);
 
   const initiateCall = (type: "voice" | "video") => {
@@ -388,7 +392,7 @@ function Conversation({ chat }: { chat: Chat }) {
       </div>
 
       {/* Input Bar / Envelope Lock */}
-      <div className="shrink-0 border-t border-sand p-3 md:px-5">
+      <div className="shrink-0 border-t border-sand p-3 md:px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-paper-raised">
         {locked ? (
           <div className="mx-auto max-w-lg">
             <div className="mb-3 flex justify-center">
@@ -477,7 +481,7 @@ export function Inbox({ chatId }: { chatId?: string }) {
     );
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-3rem)] w-full max-w-[960px] overflow-hidden border-x border-sand bg-paper-raised md:my-6 md:rounded-xl md:border md:shadow-postcard">
+    <div className="flex size-full overflow-hidden bg-paper-raised">
       <ThreadList selected={chatId} />
       {chat ? (
         <Conversation chat={chat} />
