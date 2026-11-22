@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift, Compass, Bell } from "lucide-react";
+import { Home, Clapperboard, Send, Search, Heart, PlusSquare, Menu, Footprints, KeyRound, Sparkles, Hammer, Settings, LayoutGrid, Instagram, Hourglass, X, Users, MapPinned, Store as StoreIcon, ShieldCheck, LogOut, FileText, Lock, Gift, Compass, Bell, Smartphone } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStore } from "@/lib/store";
 import { ME, searchRealUsers, getCachedRealUsers, type Person } from "@/lib/people";
 import { cn } from "@/lib/utils";
 import { OutstagramIcon } from "./OutstagramLogo";
+import { triggerPwaInstall, InstallGuideModal } from "./InstallAppBanner";
 
 export function Wordmark({ className }: { className?: string }) {
   return <span className={cn("font-logo text-3xl leading-none text-ink", className)}>Outstagram</span>;
@@ -46,6 +47,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const search = useLocation({ select: (l) => l.search as Record<string, string | undefined> });
   const [panel, setPanel] = useState<Panel>(null);
   const [seenNotes, setSeenNotes] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
   const unread = chats.filter((c) => c.messages.some((m) => !m.mine)).length;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
   const on = (to: string) => panel === null && (to === "/" ? path === "/" : path.startsWith(to));
@@ -166,6 +169,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </DropdownMenuItem>
               )}
               <div className="my-1 border-t border-sand" />
+              <DropdownMenuItem onSelect={() => triggerPwaInstall(() => setShowInstallGuide(true))} className="rounded-lg p-2.5 text-xs font-semibold text-stamp-ink cursor-pointer">
+                <Smartphone className="size-4 mr-2" />Install Mobile App
+              </DropdownMenuItem>
               <DropdownMenuItem asChild className="rounded-lg p-2 text-xs text-ink-muted cursor-pointer">
                 <Link to="/about"><Compass className="size-3.5 mr-2" />About Outstagram</Link>
               </DropdownMenuItem>
@@ -337,7 +343,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                   )}
 
                   <div className="my-2 border-t border-sand" />
-                  <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Policies & Account</p>
+                  <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-ink-muted">App & Policies</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel(null);
+                      triggerPwaInstall(() => setShowInstallGuide(true));
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-stamp-ink hover:bg-stamp-soft transition-colors text-left cursor-pointer"
+                  >
+                    <Smartphone className="size-4 text-stamp" />
+                    <span>Install Outstagram App</span>
+                  </button>
                   <Link
                     to="/terms"
                     onClick={() => setPanel(null)}
@@ -449,6 +466,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <li><Link to="/passport" search={{ tab: "stamps" }} aria-label="Passport" onClick={() => setPanel(null)}><Avatar src={myAvatar} size="size-6" className={cn("rounded-full transition-all", isPassportActive && "ring-2 ring-ink")} /></Link></li>
           </ul>
         </nav>
+      )}
+      {/* PWA Install Guide Modal */}
+      {showInstallGuide && (
+        <InstallGuideModal isIOS={isIOS} onClose={() => setShowInstallGuide(false)} />
       )}
     </div>
   );
