@@ -1,6 +1,5 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface MediaPostPlayerProps {
@@ -9,6 +8,7 @@ interface MediaPostPlayerProps {
   className?: string;
   autoPlay?: boolean;
   loop?: boolean;
+  isActive?: boolean;
 }
 
 export function MediaPostPlayer({
@@ -17,9 +17,11 @@ export function MediaPostPlayer({
   className,
   autoPlay = false,
   loop = true,
+  isActive,
 }: MediaPostPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const playerIdRef = useRef<string>(Math.random().toString(36).substring(2, 9));
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -30,6 +32,113 @@ export function MediaPostPlayer({
 
   const hideTimeoutRef = useRef<number | null>(null);
 
+  // Helper to safely pause and mute
+  const stopPlayback = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.pause();
+      } catch {}
+      video.muted = true;
+    }
+    setIsPlaying(false);
+    setIsMuted(true);
+  }, []);
+
+  // 1. Direct active state management (e.g. from parent horizontal carousel or feed)
+  useEffect(() => {
+    if (isActive === false) {
+      stopPlayback();
+    }
+  }, [isActive, stopPlayback]);
+
+  // 2. Global media coordinator: pause this video if another media/video starts playing
+  useEffect(() => {
+    const handleOtherMediaPlay = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.id !== playerIdRef.current) {
+        stopPlayback();
+      }
+    };
+
+    window.addEventListener("outstagram:media-play", handleOtherMediaPlay);
+    return () => {
+      window.removeEventListener("outstagram:media-play", handleOtherMediaPlay);
+    };
+  }, [stopPlayback]);
+
+  // 3. Tab visibility / Page hide / Window blur
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPlayback();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handleVisibilityChange);
+    };
+  }, [stopPlayback]);
+
+  // 4. Viewport IntersectionObserver: automatically pause and mute when scrolled out of view
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (typeof window !== "undefined" && "IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            // When less than 45% of the video is visible or off-screen, pause and mute immediately
+            if (!entry.isIntersecting || entry.intersectionRatio < 0.45) {
+              stopPlayback();
+            }
+          }
+        },
+        {
+          threshold: [0, 0.25, 0.45, 0.75, 1.0],
+        }
+      );
+
+      observer.observe(container);
+      return () => {
+        observer.disconnect();
+      };
+    }
+  }, [stopPlayback]);
+
+  // 5. Scroll listener fallback for horizontal/vertical overflow containers
+  useEffect(() => {
+    const checkBoundingVisibility = () => {
+      const container = containerRef.current;
+      if (!container || !videoRef.current) return;
+
+      const rect = container.getBoundingClientRect();
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+      const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+
+      // Calculate visible area relative to viewport
+      const visibleWidth = Math.max(0, Math.min(rect.right, windowWidth) - Math.max(rect.left, 0));
+      const visibleHeight = Math.max(0, Math.min(rect.bottom, windowHeight) - Math.max(rect.top, 0));
+      const visibleArea = visibleWidth * visibleHeight;
+      const totalArea = rect.width * rect.height;
+
+      // If less than 40% visible or off-screen, stop sound and playback immediately
+      if (totalArea > 0 && visibleArea / totalArea < 0.4) {
+        stopPlayback();
+      }
+    };
+
+    window.addEventListener("scroll", checkBoundingVisibility, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("scroll", checkBoundingVisibility, { capture: true });
+    };
+  }, [stopPlayback]);
+
+  // Video element events
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -45,6 +154,10 @@ export function MediaPostPlayer({
     const onPlay = () => {
       setIsPlaying(true);
       setIsEnded(false);
+      // Notify other media players
+      window.dispatchEvent(
+        new CustomEvent("outstagram:media-play", { detail: { id: playerIdRef.current } })
+      );
     };
 
     const onPause = () => {
@@ -62,20 +175,30 @@ export function MediaPostPlayer({
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onEnded);
 
-    if (autoPlay) {
-      video.play().catch(() => {
-        // Browser prevented autoplay
-      });
+    if (autoPlay && (isActive === undefined || isActive === true)) {
+      video.muted = true;
+      setIsMuted(true);
+      try {
+        const p = video.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {
+            // Browser prevented autoplay
+          });
+        }
+      } catch {}
     }
 
     return () => {
+      try {
+        video.pause();
+      } catch {}
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onEnded);
     };
-  }, [src, autoPlay]);
+  }, [src, autoPlay, isActive]);
 
   const resetHideTimer = () => {
     setShowControls(true);
@@ -94,9 +217,19 @@ export function MediaPostPlayer({
     if (!video) return;
 
     if (video.paused || video.ended) {
-      video.play().catch((e) => console.warn("Video play error:", e));
+      window.dispatchEvent(
+        new CustomEvent("outstagram:media-play", { detail: { id: playerIdRef.current } })
+      );
+      try {
+        const p = video.play();
+        if (p && typeof p.catch === "function") {
+          p.catch((e) => console.warn("Video play error:", e));
+        }
+      } catch {}
     } else {
-      video.pause();
+      try {
+        video.pause();
+      } catch {}
     }
     resetHideTimer();
   };
@@ -109,6 +242,13 @@ export function MediaPostPlayer({
     const newMuted = !video.muted;
     video.muted = newMuted;
     setIsMuted(newMuted);
+
+    // If unmuting, notify other players so only one sound source plays
+    if (!newMuted) {
+      window.dispatchEvent(
+        new CustomEvent("outstagram:media-play", { detail: { id: playerIdRef.current } })
+      );
+    }
     resetHideTimer();
   };
 

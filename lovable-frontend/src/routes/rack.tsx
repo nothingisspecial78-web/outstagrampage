@@ -286,6 +286,7 @@ function RackView() {
                 >
                   <Postcard
                     card={card}
+                    isActive={activeIndex === i}
                     onThank={() => setSelectedCard(card)}
                   />
                 </div>

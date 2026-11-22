@@ -5,7 +5,17 @@ import { Postmark } from "./Postmark";
 import { MediaPostPlayer } from "./MediaPostPlayer";
 import type { Postcard as P } from "@/lib/store";
 
-export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => void; onOpen?: () => void }) {
+export function Postcard({
+  card,
+  isActive,
+  onThank,
+  onOpen,
+}: {
+  card: P;
+  isActive?: boolean;
+  onThank?: () => void;
+  onOpen?: () => void;
+}) {
   const isVideo = card.img.startsWith("data:video") || card.img.endsWith(".mp4") || card.img.endsWith(".webm");
 
   return (
@@ -16,6 +26,7 @@ export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => v
             src={card.img}
             autoPlay
             loop
+            isActive={isActive}
             className="aspect-[3/2] w-full"
           />
         ) : (

@@ -38,6 +38,14 @@ export function AudioMessagePlayer({ audioUrl, duration = 0, mine }: AudioMessag
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("ended", onEnded);
 
+    const onOtherPlay = () => {
+      try {
+        audio.pause();
+      } catch {}
+      setIsPlaying(false);
+    };
+    window.addEventListener("outstagram:media-play", onOtherPlay);
+
     return () => {
       try {
         audio.pause();
@@ -45,6 +53,7 @@ export function AudioMessagePlayer({ audioUrl, duration = 0, mine }: AudioMessag
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
+      window.removeEventListener("outstagram:media-play", onOtherPlay);
       audioRef.current = null;
     };
   }, [audioUrl]);
@@ -52,13 +61,20 @@ export function AudioMessagePlayer({ audioUrl, duration = 0, mine }: AudioMessag
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
-      audioRef.current.pause();
+      try {
+        audioRef.current.pause();
+      } catch {}
       setIsPlaying(false);
     } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.warn("Audio playback failed:", err));
+      window.dispatchEvent(new CustomEvent("outstagram:media-play", { detail: { id: "audio-msg" } }));
+      try {
+        const p = audioRef.current.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => setIsPlaying(true)).catch((err) => console.warn("Audio playback failed:", err));
+        } else {
+          setIsPlaying(true);
+        }
+      } catch {}
     }
   };
 

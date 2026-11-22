@@ -79,4 +79,27 @@ describe("Media Post Player for Feed & Rack", () => {
     const scrubber = screen.getByLabelText(/seek video position/i);
     expect(scrubber).toBeDefined();
   });
+
+  it("stops playback and mutes video when scrolled away or isActive is false", () => {
+    const { rerender } = render(
+      <MediaPostPlayer
+        src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+        autoPlay={true}
+        isActive={true}
+      />
+    );
+
+    // Scrolled to another pic/card: isActive becomes false
+    rerender(
+      <MediaPostPlayer
+        src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+        autoPlay={true}
+        isActive={false}
+      />
+    );
+
+    // Replay/play overlay appears because video is safely stopped
+    const playBtn = screen.getByRole("button", { name: /play video/i });
+    expect(playBtn).toBeDefined();
+  });
 });
