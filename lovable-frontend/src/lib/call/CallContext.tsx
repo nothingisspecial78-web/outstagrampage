@@ -19,6 +19,8 @@ export interface CallContextType {
   peer: CallPeerInfo | null;
   isMuted: boolean;
   isCameraOff: boolean;
+  facingMode: "user" | "environment";
+  isSwitchingCamera: boolean;
   duration: number;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
@@ -44,6 +46,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [peer, setPeer] = useState<CallPeerInfo | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const [duration, setDuration] = useState(0);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -533,6 +537,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setRemoteStream(null);
     setIsMuted(false);
     setIsCameraOff(false);
+    setFacingMode("user");
+    setIsSwitchingCamera(false);
     setDuration(0);
   };
 
@@ -552,9 +558,21 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchCamera = async () => {
-    const newStream = await webrtc.switchCamera();
-    if (newStream) {
-      setLocalStream(new MediaStream(newStream.getTracks()));
+    if (callType !== "video" || isSwitchingCamera) return;
+    setIsSwitchingCamera(true);
+    try {
+      const newStream = await webrtc.switchCamera();
+      const currentMode = webrtc.getFacingMode();
+      setFacingMode(currentMode);
+      if (newStream) {
+        setLocalStream(new MediaStream(newStream.getTracks()));
+      }
+      toast.info(currentMode === "environment" ? "Switched to Back Camera" : "Switched to Front Camera");
+    } catch (err) {
+      console.error("[CallContext] Camera switch error:", err);
+      toast.error("Could not switch camera");
+    } finally {
+      setIsSwitchingCamera(false);
     }
   };
 
@@ -568,6 +586,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         peer,
         isMuted,
         isCameraOff,
+        facingMode,
+        isSwitchingCamera,
         duration,
         localStream,
         remoteStream,

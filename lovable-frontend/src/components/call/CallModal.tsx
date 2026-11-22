@@ -23,6 +23,8 @@ export function CallModal() {
     peer,
     isMuted,
     isCameraOff,
+    facingMode,
+    isSwitchingCamera,
     duration,
     localStream,
     remoteStream,
@@ -42,8 +44,9 @@ export function CallModal() {
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
     }
-  }, [localStream, status]);
+  }, [localStream, status, facingMode]);
 
   // Attach remote stream to remote video
   useEffect(() => {
@@ -188,9 +191,23 @@ export function CallModal() {
                     autoPlay
                     muted
                     playsInline
-                    className="h-full w-full object-cover [transform:scaleX(-1)]"
+                    className={cn(
+                      "h-full w-full object-cover transition-transform duration-200",
+                      facingMode === "user" ? "scale-x-[-1]" : "scale-x-100"
+                    )}
                   />
                 )}
+
+                <button
+                  type="button"
+                  onClick={switchCamera}
+                  disabled={isSwitchingCamera}
+                  className="absolute top-1.5 left-1.5 rounded-md bg-ink/70 p-1 text-paper/70 hover:text-paper"
+                  aria-label="Switch camera"
+                  title={facingMode === "user" ? "Switch to Back Camera" : "Switch to Front Camera"}
+                >
+                  <SwitchCamera className={cn("size-3", isSwitchingCamera && "animate-spin")} />
+                </button>
 
                 <button
                   type="button"
@@ -201,7 +218,7 @@ export function CallModal() {
                   <Maximize2 className="size-3" />
                 </button>
                 <div className="absolute bottom-1 left-2 rounded bg-ink/60 px-1 py-0.5 text-[9px] text-paper/80">
-                  You {isMuted && "· Muted"}
+                  You {isMuted && "· Muted"} · {facingMode === "environment" ? "Back" : "Front"}
                 </div>
               </div>
             </div>
@@ -290,10 +307,19 @@ export function CallModal() {
               variant="outline"
               size="icon"
               onClick={switchCamera}
-              className="size-12 rounded-full border-2 border-paper/30 bg-paper/15 text-paper hover:bg-paper/25 shadow-lg"
-              aria-label="Switch camera"
+              disabled={isSwitchingCamera}
+              className={cn(
+                "size-12 rounded-full border-2 border-paper/30 bg-paper/15 text-paper hover:bg-paper/25 shadow-lg relative transition-all",
+                isSwitchingCamera && "opacity-75",
+                facingMode === "environment" && "border-stamp bg-stamp/20 text-stamp-glow"
+              )}
+              aria-label={`Switch camera, currently ${facingMode === "user" ? "front camera" : "back camera"}`}
+              title={facingMode === "user" ? "Switch to Back Camera" : "Switch to Front Camera"}
             >
-              <SwitchCamera className="size-5" />
+              <SwitchCamera className={cn("size-5", isSwitchingCamera && "animate-spin")} />
+              {facingMode === "environment" && (
+                <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-stamp" />
+              )}
             </Button>
           )}
 

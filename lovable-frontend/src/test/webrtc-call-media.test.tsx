@@ -26,6 +26,13 @@ describe("WebRTC & Real-Time Communication System", () => {
     expect(manager.toggleVideo()).toBe(false);
   });
 
+  it("tracks facing mode and handles camera switching safely without stream", async () => {
+    const manager = new WebRTCManager();
+    expect(manager.getFacingMode()).toBe("user");
+    const result = await manager.switchCamera();
+    expect(result).toBeNull();
+  });
+
   it("safely handles call sound effects without throwing in non-browser/mock audio contexts", () => {
     expect(() => {
       callSounds.startOutgoingRingtone();

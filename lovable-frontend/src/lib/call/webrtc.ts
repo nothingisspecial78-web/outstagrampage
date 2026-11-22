@@ -58,6 +58,10 @@ export class WebRTCManager {
     }
   }
 
+  getFacingMode(): "user" | "environment" {
+    return this.currentFacingMode;
+  }
+
   // Request user media stream
   async getLocalMedia(type: CallType): Promise<MediaStream> {
     if (this.localStream) {
@@ -73,7 +77,7 @@ export class WebRTCManager {
       video:
         type === "video"
           ? {
-              facingMode: this.currentFacingMode,
+              facingMode: { ideal: this.currentFacingMode },
               width: { ideal: 1280, max: 1920 },
               height: { ideal: 720, max: 1080 },
             }
@@ -240,36 +244,142 @@ export class WebRTCManager {
   // Switch camera (facing mode toggle on mobile or rear/front)
   async switchCamera(): Promise<MediaStream | null> {
     if (!this.localStream) return null;
-    this.currentFacingMode = this.currentFacingMode === "user" ? "environment" : "user";
-
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: this.currentFacingMode },
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      if (!newVideoTrack) return this.localStream;
-
-      const oldVideoTrack = this.localStream.getVideoTracks()[0];
-      if (oldVideoTrack) {
-        this.localStream.removeTrack(oldVideoTrack);
-        oldVideoTrack.stop();
-      }
-      this.localStream.addTrack(newVideoTrack);
-
-      // Replace track on peer connection senders
-      if (this.pc) {
-        const senders = this.pc.getSenders();
-        const videoSender = senders.find((s) => s.track?.kind === "video");
-        if (videoSender) {
-          await videoSender.replaceTrack(newVideoTrack);
-        }
-      }
-      return this.localStream;
-    } catch (err) {
-      console.warn("Failed to switch camera:", err);
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       return this.localStream;
     }
+
+    const targetFacingMode: "user" | "environment" =
+      this.currentFacingMode === "user" ? "environment" : "user";
+
+    // 1. Grab old video track and stop it FIRST to release mobile hardware camera lock
+    const oldVideoTrack = this.localStream.getVideoTracks()[0];
+    if (oldVideoTrack) {
+      this.localStream.removeTrack(oldVideoTrack);
+      try {
+        oldVideoTrack.stop();
+      } catch (e) {
+        console.warn("Could not stop previous video track:", e);
+      }
+    }
+
+    let newStream: MediaStream | null = null;
+    let effectiveFacingMode: "user" | "environment" = targetFacingMode;
+
+    // Strategy 1: Check enumerateDevices() to find explicit back/front camera deviceId
+    try {
+      let targetDeviceId: string | undefined = undefined;
+      if (navigator.mediaDevices.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === "videoinput");
+        if (videoDevices.length > 1) {
+          if (targetFacingMode === "environment") {
+            const backCam = videoDevices.find((d) =>
+              /back|rear|environment|wide|main|primary|camera2 0|0, facing back/i.test(d.label)
+            ) || videoDevices[videoDevices.length - 1];
+            if (backCam?.deviceId) targetDeviceId = backCam.deviceId;
+          } else {
+            const frontCam = videoDevices.find((d) =>
+              /front|user|selfie|face|camera2 1|1, facing front/i.test(d.label)
+            ) || videoDevices[0];
+            if (frontCam?.deviceId) targetDeviceId = frontCam.deviceId;
+          }
+        }
+      }
+
+      if (targetDeviceId) {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            deviceId: { exact: targetDeviceId },
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+          },
+        });
+      }
+    } catch (enumErr) {
+      console.warn("[WebRTC] DeviceId specific camera request failed, falling back to facingMode:", enumErr);
+    }
+
+    // Strategy 2: Request using facingMode with { ideal }
+    if (!newStream) {
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: targetFacingMode },
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+          },
+        });
+      } catch (idealErr) {
+        console.warn("[WebRTC] Ideal facingMode request failed, trying simple facingMode:", idealErr);
+      }
+    }
+
+    // Strategy 3: Request using plain facingMode string
+    if (!newStream) {
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: targetFacingMode },
+        });
+      } catch (plainErr) {
+        console.warn("[WebRTC] Plain facingMode request failed, trying generic video fallback:", plainErr);
+      }
+    }
+
+    // Strategy 4: Fallback to any available video stream to avoid leaving user with no camera
+    if (!newStream) {
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: true,
+        });
+        // Check actual track settings if available
+        const track = newStream.getVideoTracks()[0];
+        const settings = track?.getSettings ? track.getSettings() : undefined;
+        if (settings?.facingMode === "environment" || settings?.facingMode === "user") {
+          effectiveFacingMode = settings.facingMode;
+        } else {
+          effectiveFacingMode = this.currentFacingMode;
+        }
+      } catch (finalErr) {
+        console.error("[WebRTC] All camera switch attempts failed:", finalErr);
+        return this.localStream;
+      }
+    }
+
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    if (newVideoTrack) {
+      this.currentFacingMode = effectiveFacingMode;
+      this.localStream.addTrack(newVideoTrack);
+
+      // Seamlessly replace video track on WebRTC PeerConnection sender without renegotiation
+      if (this.pc) {
+        try {
+          const senders = this.pc.getSenders();
+          let videoSender = senders.find((s) => s.track?.kind === "video");
+          if (!videoSender) {
+            const transceivers = this.pc.getTransceivers();
+            const videoTransceiver = transceivers.find(
+              (t) => t.sender.track?.kind === "video" || t.receiver.track?.kind === "video"
+            );
+            if (videoTransceiver) {
+              videoSender = videoTransceiver.sender;
+            }
+          }
+
+          if (videoSender) {
+            await videoSender.replaceTrack(newVideoTrack);
+            console.log("[WebRTC] Successfully replaced peer connection video track with new camera");
+          }
+        } catch (pcErr) {
+          console.warn("[WebRTC] Could not replace track on peer connection:", pcErr);
+        }
+      }
+    }
+
+    return this.localStream;
   }
 
   // Supabase Realtime Signaling Channel
