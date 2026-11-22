@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles, Camera, Upload, CheckCircle2, RotateCw, FileText, Download, Smartphone } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles, Camera, Upload, CheckCircle2, RotateCw, FileText, Download, Smartphone, KeyRound } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { saveRegisteredUser } from "@/lib/people";
@@ -52,6 +52,8 @@ function Login() {
   const [otpMode, setOtpMode] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpBusy, setOtpBusy] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotBusy, setForgotBusy] = useState(false);
   const [error, setError] = useState("");
   const [showInstallGuide, setShowInstallGuide] = useState(false);
   const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
@@ -244,6 +246,55 @@ function Login() {
     } catch (err: any) {
       toast.error(err.message || "Failed to launch Google Sign-In");
       setBusy(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const redirectUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/`
+        : "https://outstagrampage.vercel.app/";
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+      if (error) {
+        toast.error(error.message || "Apple Sign-In is unavailable.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to launch Apple Sign-In");
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetEmail = email.trim();
+    if (!targetEmail) {
+      setError("Please enter your registered email address.");
+      return;
+    }
+    setForgotBusy(true);
+    setError("");
+    try {
+      const redirectUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/settings`
+        : "https://outstagrampage.vercel.app/settings";
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: redirectUrl,
+      });
+      if (resetErr) {
+        setError(resetErr.message || "Could not send reset link.");
+        toast.error(resetErr.message || "Could not send reset link.");
+      } else {
+        toast.success("Password reset link sent! Please check your email inbox.");
+        setForgotMode(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
+    } finally {
+      setForgotBusy(false);
     }
   };
 
@@ -574,10 +625,10 @@ function Login() {
     <div className="min-h-screen bg-paper-raised">
       {/* Fixed Constant Top Bar for Login & Signup */}
       <header className="fixed inset-x-0 top-0 z-40 flex h-14 md:h-16 w-full items-center justify-between border-b border-sand bg-paper-raised/95 px-4 sm:px-8 backdrop-blur-md shadow-xs select-none">
-        <div className="flex items-center gap-3">
+        <a href="/" className="flex items-center gap-3 transition-transform hover:scale-[1.02] active:scale-95" aria-label="Outstagram Home">
           <OutstagramIcon size={34} />
           <Wordmark className="text-2xl sm:text-3xl text-ink" />
-        </div>
+        </a>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -610,21 +661,23 @@ function Login() {
         <div className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] md:min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center px-6 py-10">
           <div className="relative">
             <div className="mb-6 flex items-center gap-3">
-              <OutstagramIcon size={36} />
-              <Wordmark className="text-3xl text-ink" />
+              <OutstagramIcon size={40} />
+              <Wordmark className="text-3xl sm:text-4xl text-ink" />
             </div>
           <h1 className="font-serif text-3xl font-semibold text-ink lg:text-4xl">
-            {otpMode ? "Verify Your Account" : mode === "in" ? "Welcome Back" : "Get Started"}
+            {forgotMode ? "Reset Password" : otpMode ? "Verify Your Account" : mode === "in" ? "Welcome Back" : "Get Started"}
           </h1>
           <p className="mt-1.5 text-sm text-ink-muted">
-            {otpMode
+            {forgotMode
+              ? "Enter your registered email address to receive a secure password reset link."
+              : otpMode
               ? `Enter the 6-digit confirmation code (OTP) sent to your email.`
               : mode === "in"
               ? "Sign in. One quest, ten postcards, then go outside."
               : "Create an account. No likes, no followers."}
           </p>
 
-          {!otpMode && (
+          {!otpMode && !forgotMode && (
             <div role="tablist" aria-label="Account type" className="mt-6 grid grid-cols-2 rounded-2xl border border-sand bg-paper p-1">
               {(["user", "admin"] as const).map((r) => (
                 <button
@@ -636,6 +689,7 @@ function Login() {
                     setRole(r);
                     setError("");
                     setOtpMode(false);
+                    setForgotMode(false);
                     if (r === "admin") {
                       setMode("in");
                       setUsername("");
@@ -650,9 +704,60 @@ function Login() {
               ))}
             </div>
           )}
-          {role === "admin" && !otpMode && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Sign in with authorized administrator credentials to review reports, approve partner offers, manage members and set daily quests.</p>}
+          {role === "admin" && !otpMode && !forgotMode && <p className="mt-3 rounded-xl bg-stamp-soft px-3 py-2 text-xs text-stamp-ink">Sign in with authorized administrator credentials to review reports, approve partner offers, manage members and set daily quests.</p>}
 
-          {otpMode ? (
+          {forgotMode ? (
+            /* FORGOT PASSWORD VIEW */
+            <div className="mt-6 rounded-2xl border border-sand bg-paper-raised p-6 shadow-paper">
+              <div className="mx-auto grid size-12 place-items-center rounded-full bg-stamp-soft text-stamp mb-3">
+                <KeyRound className="size-6" />
+              </div>
+              <h3 className="font-serif text-xl font-bold text-ink text-center">Reset Your Password</h3>
+              <p className="mt-2 text-xs text-ink-muted text-center leading-relaxed">
+                Enter your registered email address below, and we will send you a secure link to reset your password.
+              </p>
+
+              <form onSubmit={handleForgotPassword} className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1.5">Registered Email</label>
+                  <Field icon={Mail}>
+                    <input
+                      type="email"
+                      required
+                      autoFocus
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+
+                {error && <p role="alert" className="rounded-xl bg-stamp-soft px-3 py-2 text-xs font-medium text-stamp-ink text-center">{error}</p>}
+
+                <Button
+                  type="submit"
+                  disabled={forgotBusy || !email.trim()}
+                  className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5 cursor-pointer"
+                >
+                  {forgotBusy ? "Sending reset link…" : "Send Password Reset Link"}
+                </Button>
+
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotMode(false);
+                      setError("");
+                    }}
+                    className="text-xs font-semibold text-stamp-ink hover:underline cursor-pointer"
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : otpMode ? (
             /* OTP VERIFICATION VIEW */
             <div className="mt-6 rounded-2xl border border-emerald-500/40 bg-paper-raised p-6 shadow-paper">
               <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 mb-3">
@@ -855,7 +960,16 @@ function Login() {
                 <label className="flex items-center gap-2 text-ink-muted">
                   <Checkbox defaultChecked className="data-[state=checked]:border-stamp data-[state=checked]:bg-stamp" /> Keep me signed in
                 </label>
-                <button type="button" className="font-semibold text-stamp-ink hover:underline">Forgot Password?</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotMode(true);
+                    setError("");
+                  }}
+                  className="font-semibold text-stamp-ink hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
               </div>
 
               <Button type="submit" disabled={busy} className="h-13 w-full rounded-2xl py-3.5 text-base font-bold shadow-postcard transition-transform hover:-translate-y-0.5">
@@ -864,7 +978,7 @@ function Login() {
             </form>
           )}
 
-          {!otpMode && (
+          {!otpMode && !forgotMode && (
             <>
               <div className="my-6 flex items-center gap-3 text-xs text-ink-muted"><span className="h-px flex-1 bg-sand" />or continue with<span className="h-px flex-1 bg-sand" /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -883,7 +997,7 @@ function Login() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => toast.info("Apple Sign-In is configured via WebKit")}
+                  onClick={handleAppleSignIn}
                   className="flex items-center justify-center gap-2 rounded-2xl border border-sand bg-paper-raised py-3 text-sm font-semibold text-ink transition-all hover:-translate-y-0.5 hover:shadow-paper cursor-pointer"
                 >
                   <svg className="size-4 fill-ink" viewBox="0 0 24 24" aria-hidden="true">

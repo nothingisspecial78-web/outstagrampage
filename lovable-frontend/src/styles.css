@@ -215,23 +215,10 @@ html, body {
   -webkit-tap-highlight-color: transparent !important;
 }
 
+/* Base media and touch protection */
 img, video {
   -webkit-user-drag: none !important;
   user-drag: none !important;
   -webkit-touch-callout: none !important;
   pointer-events: auto;
-}
-
-/* Instant synchronous blackout veil on blur, visibilitychange or shortcut */
-html.outstagram-shield-locked body {
-  filter: blur(60px) brightness(0) !important;
-  background-color: #1C1917 !important;
-  pointer-events: none !important;
-  user-select: none !important;
-}
-
-html.outstagram-shield-locked #outstagram-screenshot-shield {
-  display: flex !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
 }
