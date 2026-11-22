@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Wordmark } from "./AppShell";
+import { OutstagramIcon } from "./OutstagramLogo";
 import { cn } from "@/lib/utils";
 
 export function Splash() {
@@ -41,7 +42,8 @@ export function Splash() {
         </svg>
         <div className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-line" />
       </div>
-      <div className="animate-rise mt-8 text-center [animation-delay:2.2s]">
+      <div className="animate-rise mt-8 flex flex-col items-center text-center [animation-delay:2.2s]">
+        <OutstagramIcon size={52} className="mb-3 shadow-md" />
         <Wordmark className="text-4xl" />
         <p className="mt-3 max-w-xs px-6 text-sm text-ink-muted">Put the phone down. Go somewhere. Meet someone.</p>
       </div>
