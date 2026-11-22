@@ -86,7 +86,7 @@ function Capture() {
   const recordingTimerRef = useRef<any>(null);
   const isRecordingRef = useRef<boolean>(false);
 
-  const { demo, addPostcard } = useStore();
+  const { demo, addPostcard, session } = useStore();
   const f = FILTERS[filter]?.[1] ?? "";
 
   // Helper to stop stream
@@ -375,6 +375,12 @@ function Capture() {
     setSubmitting(true);
 
     try {
+      const authorId = session?.id || "44444444-4444-4444-4444-444444444401";
+      const authorName = session?.name || "Member";
+      const authorHandle = session?.handle;
+      const authorAvatar = session?.avatar;
+      const newPostcardId = crypto.randomUUID();
+
       const res = await submitPostcard({
         place_id: place,
         caption: caption.trim(),
@@ -383,18 +389,25 @@ function Capture() {
         accuracy_m: 20,
         image_base64: capturedPhoto,
         demo_mode: demo,
+        author_id: authorId,
+        author_name: authorName,
       });
 
+      const finalId = res.postcard_id || newPostcardId;
+
       addPostcard({
-        id: res.postcard_id || crypto.randomUUID(),
-        from: ME.name,
+        id: finalId,
+        from: authorName,
+        handle: authorHandle,
+        avatar: authorAvatar,
+        authorId: authorId,
         place,
         date: "TODAY",
         img: capturedPhoto,
         caption: caption.trim(),
       });
 
-      toast.success("Shared! A place stamp is in your passport.");
+      toast.success("Shared! Your moment is now live in the community feed.");
       setStep("done");
     } catch (err: any) {
       toast.error(err.message || "Failed to publish postcard");

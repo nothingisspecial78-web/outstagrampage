@@ -10,6 +10,8 @@ export interface PostcardPayload {
   accuracy_m?: number;
   image_base64: string;
   demo_mode?: boolean;
+  author_id?: string;
+  author_name?: string;
 }
 
 export interface CoachExperiment {
@@ -411,10 +413,10 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
     // Direct fallback if backend service is offline
     try {
       const postcardId = crypto.randomUUID();
-      const { data: { user } } = await supabase.auth.getUser();
-      const authorId = user?.id || '33333333-3333-3333-3333-333333333301';
+      const { data: authData } = await supabase.auth.getUser();
+      const authorId = payload.author_id || authData?.user?.id || '33333333-3333-3333-3333-333333333301';
 
-      await supabase.from('postcards').insert({
+      await supabase.from('postcards').upsert({
         id: postcardId,
         author_id: authorId,
         place_id: '22222222-2222-2222-2222-222222222201',
@@ -424,6 +426,7 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
       });
 
       await supabase.from('stamps').insert({
+        id: crypto.randomUUID(),
         user_id: authorId,
         kind: 'place',
         label: payload.place_id,
