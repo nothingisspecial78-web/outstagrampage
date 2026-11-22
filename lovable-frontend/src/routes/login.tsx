@@ -568,25 +568,40 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden lg:block">
-        <img src={friends} alt="Three friends walking along a river at golden hour" width={1024} height={1280} className="absolute inset-0 size-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" />
-        <Postmark place="Riverside walk" date="TODAY" className="absolute top-10 right-10 size-28 rounded-full bg-paper-raised/85 p-1" />
-        <div className="absolute inset-x-12 bottom-12 text-paper-raised">
-          <p className="font-hand text-3xl">The anti-Instagram.</p>
-          <p className="mt-2 max-w-md font-serif text-5xl font-semibold leading-tight">Post less. Go somewhere. Meet someone.</p>
+    <div className="min-h-screen bg-paper-raised">
+      {/* Fixed Constant Top Bar for Login & Signup */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 md:h-16 w-full items-center justify-between border-b border-sand bg-paper-raised/95 px-4 sm:px-8 backdrop-blur-md shadow-xs select-none">
+        <div className="flex items-center gap-3">
+          <OutstagramIcon size={34} />
+          <Wordmark className="text-2xl sm:text-3xl text-ink" />
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-xs font-medium text-ink-muted">The Anti-Instagram</span>
+          <span className="rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink">Post less · Go outside</span>
+        </div>
+      </header>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10">
-        <div className="absolute inset-x-0 top-0 h-60 overflow-hidden rounded-b-[2.5rem] lg:hidden"><img src={friends} alt="" width={1024} height={1280} className="size-full object-cover object-[center_35%]" /><div className="absolute inset-0 bg-gradient-to-b from-transparent to-paper/70" /></div>
-        <Postmark place="Go outside" date="TODAY" className="absolute top-36 right-6 size-24 rounded-full bg-paper-raised/90 lg:hidden" />
-        <div className="relative">
-          <div className="mb-6 flex items-center gap-3">
-            <OutstagramIcon size={36} />
-            <Wordmark className="text-3xl text-ink" />
+      <div className="pt-14 md:pt-16 min-h-screen lg:grid lg:grid-cols-2">
+        <div className="relative hidden overflow-hidden lg:block">
+          <img src={friends} alt="Three friends walking along a river at golden hour" width={1024} height={1280} className="absolute inset-0 size-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" />
+          <Postmark place="Riverside walk" date="TODAY" className="absolute top-10 right-10 size-28 rounded-full bg-paper-raised/85 p-1" />
+          <div className="absolute inset-x-12 bottom-12 text-paper-raised">
+            <div className="mb-4 inline-flex items-center gap-3 rounded-2xl bg-paper-raised/95 p-2.5 shadow-postcard backdrop-blur-xs">
+              <OutstagramIcon size={38} />
+              <Wordmark className="text-3xl text-ink pr-2" />
+            </div>
+            <p className="font-hand text-3xl">The anti-Instagram.</p>
+            <p className="mt-2 max-w-md font-serif text-5xl font-semibold leading-tight">Post less. Go somewhere. Meet someone.</p>
           </div>
+        </div>
+
+        <div className="relative mx-auto flex min-h-[calc(100vh-3.5rem)] md:min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center px-6 py-10">
+          <div className="relative">
+            <div className="mb-6 flex items-center gap-3">
+              <OutstagramIcon size={36} />
+              <Wordmark className="text-3xl text-ink" />
+            </div>
           <h1 className="font-serif text-3xl font-semibold text-ink lg:text-4xl">
             {otpMode ? "Verify Your Account" : mode === "in" ? "Welcome Back" : "Get Started"}
           </h1>
@@ -908,5 +923,6 @@ function Login() {
         </div>
       </div>
     </div>
+  </div>
   );
 }
