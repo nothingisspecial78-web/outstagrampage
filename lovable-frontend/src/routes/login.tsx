@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles, Camera, Upload, CheckCircle2, RotateCw, FileText } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User, ShieldCheck, Sparkles, Camera, Upload, CheckCircle2, RotateCw, FileText, Download, Smartphone } from "lucide-react";
 import { useStore, type Role } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { saveRegisteredUser } from "@/lib/people";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Wordmark } from "@/components/hb/AppShell";
 import { OutstagramIcon } from "@/components/hb/OutstagramLogo";
+import { triggerPwaInstall, InstallGuideModal } from "@/components/hb/InstallAppBanner";
 import friends from "@/assets/friends-walk.jpg";
 import { Postmark } from "@/components/hb/Postmark";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,8 @@ function Login() {
   const [otp, setOtp] = useState("");
   const [otpBusy, setOtpBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { signIn, demo, setDemo } = useStore();
   const nav = useNavigate();
@@ -576,8 +579,16 @@ function Login() {
           <Wordmark className="text-2xl sm:text-3xl text-ink" />
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-xs font-medium text-ink-muted">The Anti-Instagram</span>
-          <span className="rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink">Post less · Go outside</span>
+          <button
+            type="button"
+            onClick={() => triggerPwaInstall(() => setShowInstallGuide(true))}
+            className="flex items-center gap-1.5 rounded-full border border-sand bg-paper px-3 py-1.5 text-xs font-semibold text-ink hover:border-stamp hover:text-stamp-ink transition-colors cursor-pointer"
+          >
+            <Download className="size-3.5 text-stamp" />
+            <span>Install App</span>
+          </button>
+          <span className="hidden md:inline text-xs font-medium text-ink-muted">The Anti-Instagram</span>
+          <span className="hidden sm:inline-block rounded-full bg-stamp-soft px-3 py-1 text-xs font-bold text-stamp-ink">Post less · Go outside</span>
         </div>
       </header>
 
@@ -922,6 +933,11 @@ function Login() {
           <p className="text-xs text-ink-muted">{role === "admin" ? "Opening the admin console" : "Loading your journey"}</p>
         </div>
       </div>
+
+      {/* PWA Install Guide Modal */}
+      {showInstallGuide && (
+        <InstallGuideModal isIOS={isIOS} onClose={() => setShowInstallGuide(false)} />
+      )}
     </div>
   </div>
   );
