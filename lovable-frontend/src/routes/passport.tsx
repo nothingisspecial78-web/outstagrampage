@@ -37,6 +37,8 @@ import {
   Ticket,
   ChevronLeft,
   ChevronRight,
+  Camera,
+  PlusSquare,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,7 +77,7 @@ export const Route = createFileRoute("/passport")({
 
 function MemberProfile({ handle }: { handle: string }) {
   const p = profileFor(handle);
-  const { startChat, addFriendName, friends } = useStore();
+  const { startChat, addFriendName, friends, rack } = useStore();
   const nav = useNavigate();
   if (!p)
     return (
@@ -128,6 +130,53 @@ function MemberProfile({ handle }: { handle: string }) {
           </div>
         ))}
       </div>
+
+      {/* Member's Shared Moments */}
+      {(() => {
+        const memberPostcards = (rack || []).filter((c) => {
+          if (p.id && c.authorId) return c.authorId === p.id;
+          if (c.handle && p.handle) return c.handle.toLowerCase() === p.handle.toLowerCase();
+          if (c.from && p.name) {
+            const pName = p.name.toLowerCase();
+            const fromName = c.from.toLowerCase();
+            return pName === fromName || pName.includes(fromName) || fromName.includes(pName);
+          }
+          return false;
+        });
+
+        return (
+          <div className="mt-8 border-t border-sand/60 pt-6">
+            <h2 className="mb-4 font-serif text-xl font-semibold text-ink">{first}'s Moments</h2>
+            {memberPostcards.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-sand bg-paper/50 p-6 text-center text-xs text-ink-muted">
+                {first} hasn't shared any postcards yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {memberPostcards.map((c, i) => (
+                  <figure
+                    key={c.id || i}
+                    className="rounded-2xl border border-sand bg-paper-raised p-2.5 shadow-paper overflow-hidden"
+                  >
+                    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-xl bg-sand/20">
+                      {c.img.startsWith("data:video") || c.img.endsWith(".mp4") || c.img.endsWith(".webm") ? (
+                        <video src={c.img} muted playsInline className="size-full object-cover" />
+                      ) : (
+                        <img src={c.img} alt={c.place} loading="lazy" className="size-full object-cover" />
+                      )}
+                      <Postmark place={c.place} date={c.date} className="absolute top-1 right-1 scale-75 origin-top-right rounded-full bg-paper-raised/85" />
+                    </div>
+                    <figcaption className="mt-2 px-1">
+                      <p className="font-hand text-lg leading-tight text-ink font-bold">{c.place}</p>
+                      {c.caption && <p className="mt-0.5 text-xs text-ink line-clamp-2">“{c.caption}”</p>}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1117,16 +1166,83 @@ function MyProfile() {
       )}
 
       {/* TAB 5: MY POSTCARDS */}
-      {tab === "posts" && (
-        <div className="grid grid-cols-2 gap-4 py-6 sm:grid-cols-3">
-          {RACK.slice(0, 6).map((c, i) => (
-            <figure key={i} className={cn("rounded-sm border border-sand bg-paper-raised p-2 shadow-paper", i % 2 ? "rotate-1" : "-rotate-1")}>
-              <img src={c.img} alt={c.place} loading="lazy" className="aspect-[3/2] w-full object-cover rounded-sm" />
-              <figcaption className="mt-1.5 font-hand text-lg leading-5 text-ink">{c.place}</figcaption>
-            </figure>
-          ))}
-        </div>
-      )}
+      {tab === "posts" && (() => {
+        const myPostcards = (rack || []).filter((c) => {
+          if (session?.id && c.authorId) {
+            return c.authorId === session.id;
+          }
+          if (session?.name && c.from) {
+            const sName = session.name.toLowerCase();
+            const fromName = c.from.toLowerCase();
+            if (sName === fromName || sName.includes(fromName) || fromName.includes(sName)) return true;
+          }
+          if (session?.handle && c.handle) {
+            return session.handle.toLowerCase() === c.handle.toLowerCase();
+          }
+          return false;
+        });
+
+        return (
+          <div className="py-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-serif text-xl font-bold text-ink">My Shared Moments</h3>
+                <p className="text-xs text-ink-muted">Photos and videos captured by you in the real world.</p>
+              </div>
+              <Link
+                to="/capture"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-stamp px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-stamp/90 transition-all"
+              >
+                <Camera className="size-3.5" /> New Moment
+              </Link>
+            </div>
+
+            {myPostcards.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-sand bg-paper/60 p-10 text-center">
+                <Camera className="mx-auto mb-3 size-10 text-ink-muted/40" />
+                <h4 className="font-serif text-lg font-semibold text-ink">No moments shared yet</h4>
+                <p className="mt-1 text-xs text-ink-muted max-w-sm mx-auto">
+                  When you take live photos or videos from where you stand, they will appear here in your personal passport album.
+                </p>
+                <Link
+                  to="/capture"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-stamp px-4 py-2 text-xs font-semibold text-primary-foreground shadow-postcard"
+                >
+                  <PlusSquare className="size-4" /> Capture First Moment
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {myPostcards.map((c, i) => (
+                  <figure
+                    key={c.id || i}
+                    className="group relative rounded-2xl border border-sand bg-paper-raised p-2.5 shadow-paper transition-all hover:-translate-y-1 hover:shadow-postcard overflow-hidden"
+                  >
+                    <div className="relative aspect-[3/2] w-full overflow-hidden rounded-xl bg-sand/20">
+                      {c.img.startsWith("data:video") || c.img.endsWith(".mp4") || c.img.endsWith(".webm") ? (
+                        <video src={c.img} muted playsInline className="size-full object-cover" />
+                      ) : (
+                        <img
+                          src={c.img}
+                          alt={c.place}
+                          loading="lazy"
+                          className="size-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      )}
+                      <Postmark place={c.place} date={c.date} className="absolute top-1 right-1 scale-75 origin-top-right rounded-full bg-paper-raised/85" />
+                    </div>
+                    <figcaption className="mt-2 px-1">
+                      <p className="font-hand text-lg leading-tight text-ink font-bold">{c.place}</p>
+                      {c.caption && <p className="mt-0.5 text-xs text-ink line-clamp-2">“{c.caption}”</p>}
+                      <p className="mt-1 text-[10px] text-ink-muted uppercase tracking-wider">{c.date}</p>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <DigitalTicketModal
         ticket={claimedTicket}
