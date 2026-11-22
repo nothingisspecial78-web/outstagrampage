@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Terracotta squircle badge background -->
+  <rect width="128" height="128" rx="28" fill="#C85A32"/>
+  
+  <!-- Subtle inner border -->
+  <rect x="6" y="6" width="116" height="116" rx="22" stroke="rgba(255,255,255,0.25)" stroke-width="2.5"/>
+
+  <!-- Camera Viewfinder Corners -->
+  <path d="M22 40V26C22 23.7909 23.7909 22 26 22H40" stroke="white" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M106 40V26C106 23.7909 104.209 22 102 22H88" stroke="white" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M22 88V102C22 104.209 23.7909 106 26 106H40" stroke="white" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M106 88V102C106 104.209 104.209 106 102 106H88" stroke="white" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Compass dial rim -->
+  <circle cx="64" cy="64" r="36" stroke="white" stroke-width="4.5"/>
+
+  <!-- Cardinal Tick Marks -->
+  <line x1="64" y1="30" x2="64" y2="36" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="64" y1="92" x2="64" y2="98" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="30" y1="64" x2="36" y2="64" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="92" y1="64" x2="98" y2="64" stroke="white" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Rising Sun -->
+  <path d="M46 64C46 54.0589 54.0589 46 64 46C73.9411 46 82 54.0589 82 64" fill="#E88B68" opacity="0.85"/>
+  <line x1="64" y1="41" x2="64" y2="45" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="49" y1="47.5" x2="52.5" y2="51" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="79" y1="47.5" x2="75.5" y2="51" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Mountain Peaks -->
+  <polygon points="34,85 50,64 66,85" fill="#1C1917"/>
+  <polygon points="54,85 71,59 94,85" fill="#292524"/>
+
+  <!-- Compass Needle pointing North-East -->
+  <polygon points="64,64 88,36 69,56" fill="white"/>
+  <polygon points="64,64 40,92 59,72" fill="#1C1917"/>
+
+  <!-- Center Pivot Pin -->
+  <circle cx="64" cy="64" r="5.5" fill="#FAF7F2" stroke="#C85A32" stroke-width="2.5"/>
+</svg>
