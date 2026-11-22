@@ -19,6 +19,7 @@ import { IncomingCallDialog } from "@/components/call/IncomingCallDialog";
 import { AppShell } from "@/components/hb/AppShell";
 import { Splash } from "@/components/hb/Splash";
 import { AntiScreenshotGuard } from "@/components/hb/AntiScreenshotGuard";
+import { InstallAppBanner } from "@/components/hb/InstallAppBanner";
 import { Toaster } from "@/components/ui/sonner";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
@@ -90,27 +91,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     // twitter:image here: every page without its own would inherit the root's preview image.
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" },
       { title: "Outstagram — Post less. Go somewhere. Meet someone." },
       { name: "description", content: "Outstagram: send, track and deliver real-world moments around your city." },
-      { name: "author", content: "Lovable" },
+      { name: "theme-color", content: "#C85A32" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Outstagram" },
+      { name: "application-name", content: "Outstagram" },
       { property: "og:title", content: "Outstagram" },
       { property: "og:description", content: "Post less. Go somewhere. Meet someone." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Grand+Hotel&family=Inter:wght@400;500;600;700;800&display=swap" },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "icon", href: "/favicon.ico", sizes: "any" },
-      { rel: "apple-touch-icon", href: "/logo.png" },
+      { rel: "apple-touch-icon", href: "/logo-192.png" },
+      { rel: "apple-touch-icon", sizes: "192x192", href: "/logo-192.png" },
+      { rel: "apple-touch-icon", sizes: "512x512", href: "/logo-512.png" },
       { rel: "shortcut icon", href: "/favicon.ico" },
     ],
   }),
@@ -137,12 +145,29 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    // Register PWA Service Worker for mobile installation and offline capabilities
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((reg) => {
+            console.log("Outstagram PWA Service Worker registered:", reg.scope);
+          })
+          .catch((err) => {
+            console.warn("PWA Service Worker registration skipped:", err);
+          });
+      });
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <StoreProvider>
         <CallProvider>
           <AntiScreenshotGuard />
+          <InstallAppBanner />
           <Splash />
           <Shell />
           <CallModal />
