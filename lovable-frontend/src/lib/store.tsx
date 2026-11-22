@@ -8,7 +8,18 @@ import { logQuestToSupabase, logCraftToSupabase } from "./api";
 
 export const MESSAGE_LIMIT_STEP = 20;
 
-export type Postcard = { id: string; from: string; place: string; date: string; img: string; caption: string };
+export type Postcard = {
+  id: string;
+  from: string;
+  place: string;
+  date: string;
+  img: string;
+  caption: string;
+  authorId?: string;
+  avatar?: string;
+  handle?: string;
+  isDemo?: boolean;
+};
 export type Stamp = { id: string; kind: "place" | "meetup" | "quest" | "craft"; label: string; date: string };
 export type Msg = {
   id: string;
@@ -178,25 +189,34 @@ function useStoreState() {
     Promise.resolve(
       supabase
         .from('postcards')
-        .select('id, image_path, caption, taken_at, author_id, profiles(display_name, username, avatar_url), places(name)')
+        .select('id, image_path, caption, taken_at, author_id, is_demo, profiles!postcards_author_id_fkey(display_name, username, avatar_url), places(name)')
         .order('taken_at', { ascending: false })
-        .limit(30)
-    ).then(({ data }: any) => {
+        .limit(50)
+    ).then(({ data, error }: any) => {
+      if (error) {
+        console.warn("Could not fetch postcards from Supabase:", error);
+      }
       if (data && data.length > 0) {
         const liveCards: Postcard[] = data.map((p: any) => ({
           id: p.id,
-          from: p.profiles?.username || p.profiles?.display_name || "Community Member",
-          place: p.places?.name || "Outdoors",
+          from: p.profiles?.display_name || p.profiles?.username || "Community Member",
+          handle: p.profiles?.username || undefined,
+          avatar: p.profiles?.avatar_url || undefined,
+          place: p.places?.name || "Riverside Artisan Cafe",
           date: new Date(p.taken_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }).toUpperCase(),
           img: p.image_path || cafe,
           caption: p.caption,
+          authorId: p.author_id,
+          isDemo: Boolean(p.is_demo),
         }));
         setRack((existing) => {
           const ids = new Set(liveCards.map((c) => c.id));
           return [...liveCards, ...existing.filter((c) => !ids.has(c.id))];
         });
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn("Failed fetching live postcards:", err);
+    });
 
     // Real-time listener for newly shared postcards across all accounts
     const postcardSubName = `public_postcards_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -206,11 +226,17 @@ function useStoreState() {
         const row = payload.new;
         if (!row) return;
         let authorName = "Community Member";
-        let placeName = "Outdoors";
+        let handleName: string | undefined = undefined;
+        let avatarUrl: string | undefined = undefined;
+        let placeName = "Riverside Artisan Cafe";
         try {
           if (row.author_id) {
-            const { data: prof } = await supabase.from('profiles').select('username, display_name').eq('id', row.author_id).maybeSingle();
-            if (prof) authorName = prof.username || prof.display_name || authorName;
+            const { data: prof } = await supabase.from('profiles').select('username, display_name, avatar_url').eq('id', row.author_id).maybeSingle();
+            if (prof) {
+              authorName = prof.display_name || prof.username || authorName;
+              handleName = prof.username || undefined;
+              avatarUrl = prof.avatar_url || undefined;
+            }
           }
           if (row.place_id) {
             const { data: pl } = await supabase.from('places').select('name').eq('id', row.place_id).maybeSingle();
@@ -221,10 +247,14 @@ function useStoreState() {
         const newPost: Postcard = {
           id: row.id,
           from: authorName,
+          handle: handleName,
+          avatar: avatarUrl,
           place: placeName,
           date: 'TODAY',
           img: row.image_path,
           caption: row.caption,
+          authorId: row.author_id,
+          isDemo: Boolean(row.is_demo),
         };
         setRack((prev) => [newPost, ...prev.filter((c) => c.id !== newPost.id)]);
       })
@@ -544,14 +574,21 @@ function useStoreState() {
     addStamp("place", pc.place);
 
     try {
-      const authorId = session?.id || "33333333-3333-3333-3333-333333333301";
-      await supabase.from("postcards").insert({
+      const authorId = pc.authorId || session?.id || "33333333-3333-3333-3333-333333333301";
+      await supabase.from("postcards").upsert({
         id: pc.id,
         author_id: authorId,
         place_id: "22222222-2222-2222-2222-222222222201",
         image_path: pc.img,
         caption: pc.caption,
         is_demo: false,
+      });
+
+      await supabase.from("stamps").insert({
+        id: crypto.randomUUID(),
+        user_id: authorId,
+        kind: "place",
+        label: pc.place,
       });
     } catch (err) {
       console.warn("Could not save postcard to Supabase:", err);
