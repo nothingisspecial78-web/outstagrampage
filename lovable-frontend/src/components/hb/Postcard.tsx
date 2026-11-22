@@ -67,7 +67,7 @@ export function Postcard({ card, onThank, onOpen }: { card: P; onThank?: () => v
                 toast.success("Postcard link ready to share!");
               }
             }}
-            className="text-ink-muted hover:text-ink hover:bg-line p-2 rounded-xl"
+            className="text-ink-muted hover:text-ink hover:bg-line p-2 rounded-xl select-none active:scale-95 transition-transform cursor-pointer"
             aria-label="Share postcard"
           >
             <Share2 className="size-4" />

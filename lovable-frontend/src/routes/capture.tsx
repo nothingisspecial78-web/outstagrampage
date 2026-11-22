@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, ArrowLeft, Check, UserPlus, Camera, RefreshCw, Square, RotateCcw } from "lucide-react";
+import { MapPin, ArrowLeft, Check, UserPlus, Camera, RefreshCw, Square, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CharCount, Avatar } from "@/components/hb/AppShell";
 import { Postmark } from "@/components/hb/Postmark";
@@ -187,12 +187,18 @@ function Capture() {
 
   // Snap photo
   const snap = async () => {
+    // Shutter animation: brief optical shutter effect without jarring flash
     setFlash(true);
 
     let photoData = cafe;
     if (hasCamera && videoRef.current) {
       try {
         const v = videoRef.current;
+        // Freeze frame cleanly so camera doesn't blink black
+        try {
+          v.pause();
+        } catch {}
+
         const c = document.createElement("canvas");
         c.width = v.videoWidth || 640;
         c.height = v.videoHeight || 480;
@@ -213,16 +219,18 @@ function Capture() {
       photoData = await imageToJpegBase64(cafe);
     }
 
-    // Stop camera once captured
-    stopStream();
-
     setCapturedPhoto(photoData);
     setMediaType("photo");
 
+    // Transition smoothly to edit mode without layout jumping
     setTimeout(() => {
       setFlash(false);
       setStep("edit");
-    }, 180);
+      // Stop stream tracks in background after transition to avoid black frames in video element
+      setTimeout(() => {
+        stopStream();
+      }, 60);
+    }, 100);
   };
 
   // Start video recording
@@ -307,28 +315,31 @@ function Capture() {
       return;
     }
 
-    setIsHolding(true);
-    setHoldProgress(0);
     holdStartTimeRef.current = Date.now();
 
-    // Progress tick over 2000ms
-    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
-    holdIntervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - holdStartTimeRef.current;
-      const pct = Math.min(100, (elapsed / 2000) * 100);
-      setHoldProgress(pct);
-    }, 40);
-
-    // 2-second hold threshold triggers video recording automatically
+    // 200ms grace period so a simple tap does not trigger or flicker the orange hold ring
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+
     holdTimerRef.current = setTimeout(() => {
-      if (holdIntervalRef.current) {
-        clearInterval(holdIntervalRef.current);
-        holdIntervalRef.current = null;
-      }
-      setHoldProgress(100);
-      startVideoRecording();
-    }, 2000);
+      // User held longer than 200ms: activate holding indicator
+      setIsHolding(true);
+
+      holdIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - holdStartTimeRef.current;
+        const pct = Math.min(100, (elapsed / 2000) * 100);
+        setHoldProgress(pct);
+
+        if (elapsed >= 2000) {
+          if (holdIntervalRef.current) {
+            clearInterval(holdIntervalRef.current);
+            holdIntervalRef.current = null;
+          }
+          setHoldProgress(100);
+          startVideoRecording();
+        }
+      }, 30);
+    }, 200);
   };
 
   // Pointer up on shutter button
@@ -349,7 +360,7 @@ function Capture() {
     if (isRecordingRef.current) {
       stopVideoRecording();
     } else if (elapsed < 2000) {
-      // Tap / release under 2s: snap photo
+      // Tap under 2s: snap photo cleanly without ring flicker
       snap();
     }
   };
@@ -408,10 +419,10 @@ function Capture() {
       });
 
       toast.success("Shared! Your moment is now live in the community feed.");
+      // Smoothly switch to done state without double re-render
       setStep("done");
     } catch (err: any) {
       toast.error(err.message || "Failed to publish postcard");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -485,7 +496,12 @@ function Capture() {
             </div>
           )}
 
-          {flash && <div className="absolute inset-0 bg-paper-raised" />}
+          {flash && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-30 bg-black/40 backdrop-blur-[0.5px] transition-opacity duration-100 animate-in fade-in"
+            />
+          )}
 
           {/* Shutter Button with Hold 2-Second Ring & Hint */}
           <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-2 z-20">
@@ -555,7 +571,7 @@ function Capture() {
 
   if (step === "done")
     return (
-      <div className="paper-card animate-rise mx-auto max-w-md p-8 text-center">
+      <div className="paper-card mx-auto max-w-md p-8 text-center transition-all duration-200 animate-in fade-in-50 zoom-in-95">
         <div className="relative mx-auto w-56">
           {mediaType === "video" ? (
             <video
@@ -584,10 +600,10 @@ function Capture() {
           That's your one post for today. Now enjoy {place}.
         </p>
         <div className="mt-6 flex justify-center gap-2">
-          <Link to="/" className="rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground">
+          <Link to="/" className="rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-stamp-ink transition-colors">
             Back to feed
           </Link>
-          <Link to="/passport" className="rounded-xl bg-line px-4 py-2.5 text-sm font-semibold text-ink">
+          <Link to="/passport" className="rounded-xl bg-line px-4 py-2.5 text-sm font-semibold text-ink hover:bg-sand transition-colors">
             See stamp
           </Link>
         </div>
@@ -611,9 +627,10 @@ function Capture() {
             share();
           }}
           disabled={submitting}
-          className="text-sm font-bold text-link hover:underline cursor-pointer"
+          className="flex items-center gap-1.5 text-sm font-bold text-link hover:underline disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed select-none"
         >
-          {submitting ? "Sharing…" : "Share"}
+          {submitting && <Loader2 className="size-3.5 animate-spin" />}
+          <span>{submitting ? "Sharing…" : "Share"}</span>
         </button>
       </header>
 
@@ -660,8 +677,8 @@ function Capture() {
 
         <div className="space-y-4 border-t border-sand p-4 md:border-t-0 md:border-l">
           <div className="flex items-center gap-2">
-            <Avatar src={ME.avatar} size="size-7" />
-            <span className="text-sm font-semibold text-ink">{ME.handle}</span>
+            <Avatar src={session?.avatar || (session?.name ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.name)}` : ME.avatar)} size="size-7" />
+            <span className="text-sm font-semibold text-ink">{session?.handle || ME.handle}</span>
           </div>
 
           <div>
@@ -735,9 +752,18 @@ function Capture() {
               share();
             }}
             disabled={submitting}
-            className="w-full rounded-xl bg-stamp hover:bg-stamp-ink py-3 text-sm font-bold text-primary-foreground shadow-md transition-all active:scale-98 cursor-pointer"
+            className="flex items-center justify-center gap-2 w-full rounded-xl bg-stamp hover:bg-stamp-ink py-3 text-sm font-bold text-primary-foreground shadow-md transition-all active:scale-[0.99] disabled:opacity-80 cursor-pointer disabled:cursor-not-allowed select-none"
           >
-            {submitting ? "Sharing to today's rack…" : caption.trim().length >= 8 ? "Share to Today's Rack" : "Write at least 8 chars to share"}
+            {submitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin shrink-0" />
+                <span>Sharing to today's rack…</span>
+              </>
+            ) : caption.trim().length >= 8 ? (
+              "Share to Today's Rack"
+            ) : (
+              "Write at least 8 chars to share"
+            )}
           </button>
         </div>
       </div>
