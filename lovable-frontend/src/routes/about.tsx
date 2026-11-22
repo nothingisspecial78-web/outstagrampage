@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Compass, Heart, Footprints, ShieldCheck, Sparkles, MapPin, Gift, Hourglass } from "lucide-react";
 import { Postmark } from "@/components/hb/Postmark";
 import { Wordmark } from "@/components/hb/AppShell";
+import { OutstagramIcon } from "@/components/hb/OutstagramLogo";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/about")({
@@ -26,7 +27,10 @@ function AboutPage() {
         <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink transition-colors">
           <ArrowLeft className="size-4" /> Back to Outstagram
         </Link>
-        <Wordmark className="text-2xl" />
+        <div className="flex items-center gap-2">
+          <OutstagramIcon size={26} />
+          <Wordmark className="text-2xl" />
+        </div>
       </div>
 
       {/* Hero Card */}
