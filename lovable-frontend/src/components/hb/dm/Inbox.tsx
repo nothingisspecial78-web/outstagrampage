@@ -35,7 +35,7 @@ function personFor(name: string, peerId?: string) {
   );
 }
 
-function Face({ name, avatar, size = "size-11" }: { name: string; avatar?: string; size?: string }) {
+function Face({ name, avatar, size = "size-11" }: { name: string; avatar?: string | undefined; size?: string | undefined }) {
   const person = personFor(name, undefined);
   const src = avatar || person?.avatar || (name ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}` : undefined);
   return src ? (

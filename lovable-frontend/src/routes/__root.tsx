@@ -95,9 +95,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Outstagram — Post less. Go somewhere. Meet someone." },
       { name: "description", content: "Outstagram: send, track and deliver real-world moments around your city." },
       { name: "theme-color", content: "#C85A32" },
+      { name: "color-scheme", content: "light" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "Outstagram" },
       { name: "application-name", content: "Outstagram" },
       { property: "og:title", content: "Outstagram" },
@@ -130,11 +131,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="bg-paper text-ink" style={{ backgroundColor: "#FAF7F2", colorScheme: "light" }}>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="min-h-screen bg-paper text-ink" style={{ backgroundColor: "#FAF7F2" }}>
         {children}
         <Scripts />
       </body>

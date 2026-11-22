@@ -26,7 +26,7 @@ export function Postcard({
             src={card.img}
             autoPlay
             loop
-            isActive={isActive}
+            isActive={Boolean(isActive)}
             className="aspect-[3/2] w-full"
           />
         ) : (

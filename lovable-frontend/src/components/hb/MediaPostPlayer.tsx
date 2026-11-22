@@ -29,6 +29,49 @@ export function MediaPostPlayer({
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(false);
   const [isEnded, setIsEnded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string>(src);
+
+  // Convert raw base64 data URLs to streamable Blob URLs for mobile browsers (iOS WebKit & Android Chrome)
+  useEffect(() => {
+    let active = true;
+    let createdUrl: string | null = null;
+
+    if (src && src.startsWith("data:video")) {
+      try {
+        const parts = src.split(",");
+        const mime = parts[0]?.match(/:(.*?);/)?.[1] || "video/webm";
+        const bstr = atob(parts[1] || "");
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        createdUrl = URL.createObjectURL(blob);
+        if (active) {
+          setVideoSrc(createdUrl);
+          setHasError(false);
+        }
+      } catch {
+        if (active) setVideoSrc(src);
+      }
+    } else {
+      if (active) {
+        setVideoSrc(src);
+        setHasError(false);
+      }
+    }
+
+    return () => {
+      active = false;
+      if (createdUrl) {
+        try {
+          URL.revokeObjectURL(createdUrl);
+        } catch {}
+      }
+    };
+  }, [src]);
 
   const hideTimeoutRef = useRef<number | null>(null);
 
@@ -108,6 +151,7 @@ export function MediaPostPlayer({
         observer.disconnect();
       };
     }
+    return undefined;
   }, [stopPlayback]);
 
   // 5. Scroll listener fallback for horizontal/vertical overflow containers
@@ -287,18 +331,33 @@ export function MediaPostPlayer({
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      className={cn("group relative overflow-hidden bg-black select-none", className)}
+      className={cn("group relative overflow-hidden bg-sand/20 select-none", className)}
     >
       <video
         ref={videoRef}
-        src={src}
+        src={videoSrc}
         poster={poster}
         loop={loop}
         muted={isMuted}
         playsInline
         onClick={togglePlay}
+        onError={() => setHasError(true)}
         className="h-full w-full object-cover cursor-pointer"
       />
+
+      {hasError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-900/90 p-4 text-center text-paper-raised">
+          <RotateCcw className="mb-2 size-8 text-stamp animate-bounce" />
+          <p className="text-xs font-semibold">Video preview ready</p>
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="mt-2 rounded-lg bg-stamp px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-stamp/90"
+          >
+            Play Video
+          </button>
+        </div>
+      )}
 
       {/* Big Center Play / Replay Overlay Button when paused */}
       {(!isPlaying || isEnded) && (

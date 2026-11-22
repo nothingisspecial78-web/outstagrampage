@@ -82,7 +82,7 @@ function Login() {
         enter(
           email.trim(),
           "user",
-          username.trim() || user.user_metadata?.username || "Member",
+          username.trim() || (user.user_metadata?.["username"] as string | undefined) || "Member",
           "Account verified — welcome to Outstagram!",
           user.id,
           generatedCode,
@@ -142,7 +142,7 @@ function Login() {
     bioText?: string
   ) => {
     const userId = id || mail;
-    const displayName = n || (r === "admin" ? "Admin" : mail.split("@")[0]);
+    const displayName = n || (r === "admin" ? "Admin" : (mail.split("@")[0] ?? "Member"));
     const finalAvatar = avatarSrc || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
     signIn(mail, r, displayName, userId, friendCode, finalAvatar, bioText);
     saveRegisteredUser({
@@ -545,7 +545,7 @@ function Login() {
               enter(
                 email.trim(),
                 "user",
-                username.trim() || user.user_metadata?.username || "Member",
+                username.trim() || (user.user_metadata?.["username"] as string | undefined) || "Member",
                 "Account verified — welcome to Outstagram!",
                 user.id,
                 generatedCode,

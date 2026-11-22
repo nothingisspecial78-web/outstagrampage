@@ -38,8 +38,8 @@ export interface GroupMeetup {
   points_reward: number;
   plain_code: string;
   status: string;
-  host_id?: string;
-  created_at?: string;
+  host_id?: string | undefined;
+  created_at?: string | undefined;
 }
 
 function GroupGoalsView() {

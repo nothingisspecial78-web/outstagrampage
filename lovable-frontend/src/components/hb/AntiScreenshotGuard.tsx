@@ -114,16 +114,23 @@ export function AntiScreenshotGuard() {
       toast.info("Outstagram: Content copying is restricted to protect privacy.");
     };
 
-    // 5. Block screen sharing API (getDisplayMedia)
+    // 5. Block screen sharing API (getDisplayMedia) safely
     if (typeof navigator !== "undefined" && navigator.mediaDevices) {
       try {
-        navigator.mediaDevices.getDisplayMedia = async function () {
-          toast.error("Screen recording is prohibited on Outstagram to preserve privacy.");
-          throw new DOMException(
-            "Screen recording is prohibited on Outstagram to preserve privacy.",
-            "NotAllowedError"
-          );
-        };
+        if (typeof navigator.mediaDevices.getDisplayMedia === "function") {
+          const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+          Object.defineProperty(navigator.mediaDevices, "getDisplayMedia", {
+            value: async function () {
+              toast.error("Screen recording is prohibited on Outstagram to preserve privacy.");
+              throw new DOMException(
+                "Screen recording is prohibited on Outstagram to preserve privacy.",
+                "NotAllowedError"
+              );
+            },
+            configurable: true,
+            writable: true,
+          });
+        }
       } catch {}
     }
 
@@ -143,23 +150,5 @@ export function AntiScreenshotGuard() {
     };
   }, []);
 
-  const userHandle = session?.name || "member";
-
-  return (
-    <>
-      {/* Subtle, translucent anti-camera security watermark across background */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[35] select-none overflow-hidden opacity-[0.025] mix-blend-difference"
-      >
-        <div className="absolute inset-0 -rotate-12 scale-125 flex flex-wrap gap-x-24 gap-y-16 font-mono text-[10px] font-bold text-ink">
-          {Array.from({ length: 48 }).map((_, i) => (
-            <span key={i} className="whitespace-nowrap tracking-widest">
-              OUTSTAGRAM PRIVACY · @{userHandle.toLowerCase()} · DO NOT CAPTURE
-            </span>
-          ))}
-        </div>
-      </div>
-    </>
-  );
+  return null;
 }

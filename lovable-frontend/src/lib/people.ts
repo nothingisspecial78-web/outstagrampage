@@ -1,12 +1,12 @@
 import { supabase } from "@/lib/supabase";
 
 export type Person = {
-  id?: string;
+  id?: string | undefined;
   handle: string;
   name: string;
   avatar: string;
-  friendCode?: string;
-  bio?: string;
+  friendCode?: string | undefined;
+  bio?: string | undefined;
 };
 
 const av = (n: number) => `https://i.pravatar.cc/150?img=${n}`;

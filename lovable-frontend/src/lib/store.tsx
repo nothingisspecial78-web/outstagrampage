@@ -15,28 +15,28 @@ export type Postcard = {
   date: string;
   img: string;
   caption: string;
-  authorId?: string;
-  avatar?: string;
-  handle?: string;
-  isDemo?: boolean;
+  authorId?: string | undefined;
+  avatar?: string | undefined;
+  handle?: string | undefined;
+  isDemo?: boolean | undefined;
 };
 export type Stamp = { id: string; kind: "place" | "meetup" | "quest" | "craft"; label: string; date: string };
 export type Msg = {
   id: string;
   mine: boolean;
   text: string;
-  audioUrl?: string;
-  audioDuration?: number;
-  postcard?: Postcard;
+  audioUrl?: string | undefined;
+  audioDuration?: number | undefined;
+  postcard?: Postcard | undefined;
   callRecord?: {
     type: "voice" | "video";
     status: "completed" | "missed" | "declined";
-    duration?: number;
-  };
-  clientMsgId?: string;
-  createdAt?: number;
+    duration?: number | undefined;
+  } | undefined;
+  clientMsgId?: string | undefined;
+  createdAt?: number | undefined;
 };
-export type Chat = { id: string; peerId?: string; peerAvatar?: string; name: string; place: string; limit: number; messages: Msg[] };
+export type Chat = { id: string; peerId?: string | undefined; peerAvatar?: string | undefined; name: string; place: string; limit: number; messages: Msg[] };
 export type Craft = { id: string; title: string; mediums: string[]; notes: string; date: string };
 
 const imgs = [cafe, garden, books, pier];
@@ -64,7 +64,16 @@ const initialStamps: Stamp[] = [];
 const initialCrafts: Craft[] = [];
 
 export type Role = "user" | "admin";
-export type Session = { id?: string; name: string; email: string; role: Role; friendCode?: string; avatar?: string; bio?: string };
+export type Session = {
+  id?: string | undefined;
+  name: string;
+  email: string;
+  role: Role;
+  friendCode?: string | undefined;
+  avatar?: string | undefined;
+  bio?: string | undefined;
+  handle?: string | undefined;
+};
 export type Report = { id: string; what: string; by: string; reason: string; status: "open" | "kept" | "removed" };
 export type Offer = { id: string; place: string; partner: string; text: string; status: "pending" | "live" | "rejected" };
 export type Member = { id: string; name: string; handle: string; role: Role | "partner"; status: "active" | "suspended"; joined: string };
@@ -140,11 +149,11 @@ function useStoreState() {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, authSession) => {
       if (authSession?.user) {
         const u = authSession.user;
-        let displayName = u.user_metadata?.display_name || u.user_metadata?.username || u.email?.split("@")[0] || "Member";
+        let displayName = (u.user_metadata?.["display_name"] as string | undefined) || (u.user_metadata?.["username"] as string | undefined) || u.email?.split("@")[0] || "Member";
         let userRole: Role = u.email === "nothingisspecial78@gmail.com" ? "admin" : "user";
         let friendCode: string | undefined = undefined;
-        let avatarUrl: string | undefined = u.user_metadata?.avatar_url;
-        let bioText: string | undefined = u.user_metadata?.bio;
+        let avatarUrl: string | undefined = u.user_metadata?.["avatar_url"] as string | undefined;
+        let bioText: string | undefined = u.user_metadata?.["bio"] as string | undefined;
 
         try {
           const { data: profile } = await supabase
@@ -266,6 +275,16 @@ function useStoreState() {
       })
       .subscribe();
 
+    const postcardBroadcastSub = supabase
+      .channel("public_postcards_broadcast")
+      .on("broadcast", { event: "new_community_postcard" }, (payload: any) => {
+        const p = payload?.payload?.postcard;
+        if (p && p.id) {
+          setRack((prev) => [p, ...prev.filter((c) => c.id !== p.id)]);
+        }
+      })
+      .subscribe();
+
     // Fetch live registered members from Supabase profiles
     Promise.resolve(
       supabase.from("profiles").select("id, display_name, friend_code, created_at").limit(50)
@@ -289,6 +308,7 @@ function useStoreState() {
       authListener?.subscription?.unsubscribe();
       try {
         supabase.removeChannel(postcardSub);
+        supabase.removeChannel(postcardBroadcastSub);
       } catch {}
     };
   }, []);
@@ -302,10 +322,12 @@ function useStoreState() {
     const myEmail = (session.email || "").toLowerCase();
 
     // 1. Initial Load of past Direct Messages from Supabase
-    supabase
-      .from("direct_messages")
-      .select("*")
-      .order("created_at", { ascending: true })
+    Promise.resolve(
+      supabase
+        .from("direct_messages")
+        .select("*")
+        .order("created_at", { ascending: true })
+    )
       .then(({ data }: any) => {
         if (!data || data.length === 0) return;
         const relevant = data.filter((m: any) => {
@@ -325,10 +347,11 @@ function useStoreState() {
           setChats((prev) => {
             const updated = [...prev];
             relevant.forEach((row: any) => {
-              const isMine =
+              const isMine = Boolean(
                 row.sender_id === myId ||
                 row.sender_id === myEmail ||
-                (myName && row.sender_name?.toLowerCase() === myName);
+                (myName && row.sender_name?.toLowerCase() === myName)
+              );
               const peerId = isMine ? row.receiver_id : row.sender_id;
               const peerName = isMine ? row.receiver_name : row.sender_name;
               const peerAvatar = isMine ? undefined : row.sender_avatar;
@@ -570,7 +593,7 @@ function useStoreState() {
       id: userId,
       email,
       role,
-      name: name || (role === "admin" ? "Admin" : email.split("@")[0]),
+      name: name || (role === "admin" ? "Admin" : (email.split("@")[0] ?? "Member")),
       friendCode,
       avatar,
       bio,
@@ -600,12 +623,12 @@ function useStoreState() {
     setPoints((p) => {
       const next = p + amount;
       if (session?.id) {
-        supabase
-          .from("profiles")
-          .update({ points: next })
-          .eq("id", session.id)
-          .then(() => {})
-          .catch(() => {});
+        Promise.resolve(
+          supabase
+            .from("profiles")
+            .update({ points: next })
+            .eq("id", session.id)
+        ).catch(() => {});
       }
       return next;
     });
@@ -619,7 +642,7 @@ function useStoreState() {
     addStamp("place", pc.place);
 
     try {
-      const authorId = pc.authorId || session?.id || "33333333-3333-3333-3333-333333333301";
+      const authorId = pc.authorId || session?.id || "44444444-4444-4444-4444-444444444401";
       await supabase.from("postcards").upsert({
         id: pc.id,
         author_id: authorId,
@@ -635,6 +658,23 @@ function useStoreState() {
         kind: "place",
         label: pc.place,
       });
+
+      // Broadcast new postcard to all active community feeds
+      try {
+        const ch = supabase.channel("public_postcards_broadcast");
+        ch.subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await ch.send({
+              type: "broadcast",
+              event: "new_community_postcard",
+              payload: { postcard: pc },
+            });
+            setTimeout(() => {
+              try { supabase.removeChannel(ch); } catch {}
+            }, 1000);
+          }
+        });
+      } catch {}
     } catch (err) {
       console.warn("Could not save postcard to Supabase:", err);
     }
@@ -714,17 +754,19 @@ function useStoreState() {
     const targetReceiverName = targetChat?.name || "Friend";
 
     // Insert into Supabase direct_messages table for persistent cross-account chat
-    supabase
-      .from("direct_messages")
-      .insert({
-        sender_id: session?.id || session?.email || "self",
-        sender_name: session?.name || "Member",
-        sender_avatar: session?.avatar,
-        receiver_id: targetReceiverId,
-        receiver_name: targetReceiverName,
-        body: trimmed,
-        client_msg_id: clientMsgId,
-      })
+    Promise.resolve(
+      supabase
+        .from("direct_messages")
+        .insert({
+          sender_id: session?.id || session?.email || "self",
+          sender_name: session?.name || "Member",
+          sender_avatar: session?.avatar,
+          receiver_id: targetReceiverId,
+          receiver_name: targetReceiverName,
+          body: trimmed,
+          client_msg_id: clientMsgId,
+        })
+    )
       .then(({ error }: any) => {
         if (error) console.warn("direct_messages insert error:", error);
       })
@@ -792,19 +834,21 @@ function useStoreState() {
     const targetReceiverName = targetChat?.name || "Friend";
 
     // Insert voice into direct_messages table
-    supabase
-      .from("direct_messages")
-      .insert({
-        sender_id: session?.id || session?.email || "self",
-        sender_name: session?.name || "Member",
-        sender_avatar: session?.avatar,
-        receiver_id: targetReceiverId,
-        receiver_name: targetReceiverName,
-        body: "Voice message",
-        audio_url: audioUrl,
-        audio_duration: duration,
-        client_msg_id: clientMsgId,
-      })
+    Promise.resolve(
+      supabase
+        .from("direct_messages")
+        .insert({
+          sender_id: session?.id || session?.email || "self",
+          sender_name: session?.name || "Member",
+          sender_avatar: session?.avatar,
+          receiver_id: targetReceiverId,
+          receiver_name: targetReceiverName,
+          body: "Voice message",
+          audio_url: audioUrl,
+          audio_duration: duration,
+          client_msg_id: clientMsgId,
+        })
+    )
       .then(({ error }: any) => {
         if (error) console.warn("direct_messages voice insert error:", error);
       })
@@ -906,17 +950,19 @@ function useStoreState() {
     });
 
     // Also persist postcard note in direct_messages
-    supabase
-      .from("direct_messages")
-      .insert({
-        sender_id: session?.id || session?.email || "self",
-        sender_name: session?.name || "Member",
-        sender_avatar: session?.avatar,
-        receiver_id: chatId,
-        receiver_name: first,
-        body: noteText,
-        postcard: newMsg.postcard,
-      })
+    Promise.resolve(
+      supabase
+        .from("direct_messages")
+        .insert({
+          sender_id: session?.id || session?.email || "self",
+          sender_name: session?.name || "Member",
+          sender_avatar: session?.avatar,
+          receiver_id: chatId,
+          receiver_name: first,
+          body: noteText,
+          postcard: newMsg.postcard,
+        })
+    )
       .then(() => {})
       .catch(() => {});
 

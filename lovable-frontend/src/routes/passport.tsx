@@ -50,12 +50,13 @@ import {
 } from "@/components/hb/rewards/TicketPasses";
 import { Postmark } from "@/components/hb/Postmark";
 import { Avatar } from "@/components/hb/AppShell";
-import { RACK, useStore, type Stamp, PLACES_INFO } from "@/lib/store";
+import { RACK, useStore, type Stamp, type Postcard, PLACES_INFO } from "@/lib/store";
 import { ME, profileFor } from "@/lib/people";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/passport")({
   head: () => ({
@@ -68,10 +69,12 @@ export const Route = createFileRoute("/passport")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>): { user?: string; tab?: string } => ({
-    user: typeof s["user"] === "string" ? s["user"] : undefined,
-    tab: typeof s["tab"] === "string" ? s["tab"] : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { user?: string | undefined; tab?: string | undefined } => {
+    const res: { user?: string | undefined; tab?: string | undefined } = {};
+    if (typeof s["user"] === "string") res.user = s["user"];
+    if (typeof s["tab"] === "string") res.tab = s["tab"];
+    return res;
+  },
   component: Profile,
 });
 
@@ -274,13 +277,60 @@ function Profile() {
 }
 
 function MyProfile() {
-  const { stamps, hours, session, addStamp } = useStore();
+  const { stamps, hours, session, addStamp, rack } = useStore();
   const nav = useNavigate();
   const search = Route.useSearch();
   const initialTab = search.tab && TABS.some((t) => t.id === search.tab)
     ? (search.tab as (typeof TABS)[number]["id"])
     : "rewards";
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(initialTab);
+
+  // Fetch real user postcards directly from Supabase
+  const [userDbPostcards, setUserDbPostcards] = useState<Postcard[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function loadUserPosts() {
+      try {
+        setLoadingPosts(true);
+        const { data, error } = await supabase
+          .from("postcards")
+          .select("id, image_path, caption, taken_at, author_id, is_demo, profiles!postcards_author_id_fkey(display_name, username, avatar_url), places(name)")
+          .order("taken_at", { ascending: false });
+
+        if (!error && data && active) {
+          const mapped: Postcard[] = data.map((p: any) => ({
+            id: p.id,
+            from: p.profiles?.display_name || p.profiles?.username || session?.name || "Community Member",
+            handle: p.profiles?.username || session?.handle,
+            avatar: p.profiles?.avatar_url || session?.avatar,
+            place: p.places?.name || "Riverside Artisan Cafe",
+            date: new Date(p.taken_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }).toUpperCase(),
+            img: p.image_path,
+            caption: p.caption,
+            authorId: p.author_id,
+            isDemo: Boolean(p.is_demo),
+          }));
+
+          const mine = mapped.filter((c) => {
+            if (session?.id && c.authorId && c.authorId === session.id) return true;
+            if (session?.name && c.from && (session.name.toLowerCase() === c.from.toLowerCase() || session.name.toLowerCase().includes(c.from.toLowerCase()) || c.from.toLowerCase().includes(session.name.toLowerCase()))) return true;
+            if (session?.handle && c.handle && session.handle.toLowerCase() === c.handle.toLowerCase()) return true;
+            if ((session?.role === "admin" || session?.id === "44444444-4444-4444-4444-444444444401") && c.authorId === "44444444-4444-4444-4444-444444444401") return true;
+            return false;
+          });
+          setUserDbPostcards(mine);
+        }
+      } catch (err) {
+        console.warn("Error fetching user postcards:", err);
+      } finally {
+        if (active) setLoadingPosts(false);
+      }
+    }
+    loadUserPosts();
+    return () => { active = false; };
+  }, [session?.id, session?.name, session?.handle, session?.role]);
 
   useEffect(() => {
     if (search.tab && TABS.some((t) => t.id === search.tab)) {
@@ -311,10 +361,11 @@ function MyProfile() {
   };
 
   const handleActivateChallenge = (t: TicketVoucher) => {
-    setActiveChallenges((prev) => ({
-      ...prev,
-      [t.id]: prev[t.id] !== undefined ? prev[t.id] : 0,
-    }));
+    setActiveChallenges((prev) => {
+      const copy: Record<string, number> = { ...prev };
+      copy[t.id] = copy[t.id] ?? 0;
+      return copy;
+    });
     toast.success(`Challenge Activated: ${t.title}`, {
       description: `Target: ${t.targetAmount.toLocaleString()} ${t.unit}. Walk, explore & track your progress!`,
     });
@@ -367,7 +418,7 @@ function MyProfile() {
   const stats = [
     [String(count("quest")), "quests"],
     [String(count("meetup")), "meetups"],
-    [String(count("place")), "postcards"],
+    [String(Math.max(count("place"), userDbPostcards.length)), "postcards"],
     [String(count("craft")), "crafts"],
   ] as const;
 
@@ -421,7 +472,7 @@ function MyProfile() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => { setTab(t.id); nav({ search: (prev: any) => ({ ...prev, tab: t.id }), replace: true }); }}
+            onClick={() => { setTab(t.id); nav({ to: "/passport", search: { tab: t.id }, replace: true }); }}
             className={cn(
               "-mt-px flex items-center gap-1.5 border-t py-4 text-xs font-semibold tracking-wider uppercase whitespace-nowrap transition-colors",
               tab === t.id ? "border-stamp text-stamp font-bold" : "border-transparent text-ink-muted hover:text-ink"
@@ -1167,20 +1218,19 @@ function MyProfile() {
 
       {/* TAB 5: MY POSTCARDS */}
       {tab === "posts" && (() => {
-        const myPostcards = (rack || []).filter((c) => {
-          if (session?.id && c.authorId) {
-            return c.authorId === session.id;
+        const combined = new Map<string, Postcard>();
+        userDbPostcards.forEach((p) => combined.set(p.id, p));
+        (rack || []).forEach((c) => {
+          if (
+            (session?.id && c.authorId && c.authorId === session.id) ||
+            (session?.name && c.from && (session.name.toLowerCase() === c.from.toLowerCase() || session.name.toLowerCase().includes(c.from.toLowerCase()) || c.from.toLowerCase().includes(session.name.toLowerCase()))) ||
+            (session?.handle && c.handle && session.handle.toLowerCase() === c.handle.toLowerCase()) ||
+            ((session?.role === "admin" || session?.id === "44444444-4444-4444-4444-444444444401") && c.authorId === "44444444-4444-4444-4444-444444444401")
+          ) {
+            combined.set(c.id, c);
           }
-          if (session?.name && c.from) {
-            const sName = session.name.toLowerCase();
-            const fromName = c.from.toLowerCase();
-            if (sName === fromName || sName.includes(fromName) || fromName.includes(sName)) return true;
-          }
-          if (session?.handle && c.handle) {
-            return session.handle.toLowerCase() === c.handle.toLowerCase();
-          }
-          return false;
         });
+        const myPostcards = Array.from(combined.values());
 
         return (
           <div className="py-6">
@@ -1197,7 +1247,11 @@ function MyProfile() {
               </Link>
             </div>
 
-            {myPostcards.length === 0 ? (
+            {loadingPosts && myPostcards.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-sand bg-paper/60 p-10 text-center">
+                <p className="text-sm text-ink-muted">Loading your shared moments…</p>
+              </div>
+            ) : myPostcards.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-sand bg-paper/60 p-10 text-center">
                 <Camera className="mx-auto mb-3 size-10 text-ink-muted/40" />
                 <h4 className="font-serif text-lg font-semibold text-ink">No moments shared yet</h4>
@@ -1220,7 +1274,7 @@ function MyProfile() {
                   >
                     <div className="relative aspect-[3/2] w-full overflow-hidden rounded-xl bg-sand/20">
                       {c.img.startsWith("data:video") || c.img.endsWith(".mp4") || c.img.endsWith(".webm") ? (
-                        <video src={c.img} muted playsInline className="size-full object-cover" />
+                        <video src={c.img} muted playsInline autoPlay loop className="size-full object-cover" />
                       ) : (
                         <img
                           src={c.img}
@@ -1278,7 +1332,7 @@ function MyProfile() {
   );
 }
 
-function Bio({ name, bio, hours, points }: { name: string; bio?: string; hours: number; points: number }) {
+function Bio({ name, bio, hours, points }: { name: string; bio?: string | undefined; hours: number; points: number }) {
   return (
     <div className="space-y-1.5 text-sm">
       <p className="font-semibold text-ink">{name}</p>

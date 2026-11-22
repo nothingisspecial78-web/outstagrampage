@@ -89,17 +89,7 @@ function RackView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketVoucher | null>(null);
 
-  // Combine regular postcards with physical brand sponsor postcards
-  const allCards = [
-    ...rack.slice(0, 2),
-    SPONSOR_POSTCARDS[0]!,
-    ...rack.slice(2, 5),
-    SPONSOR_POSTCARDS[1]!,
-    ...rack.slice(5, 8),
-    SPONSOR_POSTCARDS[2]!,
-    ...rack.slice(8),
-  ];
-  const totalItems = allCards.length;
+  const totalItems = rack.length;
 
   const updateActiveIndex = () => {
     if (!containerRef.current) return;

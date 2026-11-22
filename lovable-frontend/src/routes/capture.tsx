@@ -9,6 +9,7 @@ import { ME, getCachedRealUsers, type Person } from "@/lib/people";
 import { cn } from "@/lib/utils";
 import cafe from "@/assets/pc-cafe.jpg";
 import { submitPostcard } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/capture")({
   head: () => ({
@@ -386,10 +387,34 @@ function Capture() {
     setSubmitting(true);
 
     try {
-      const authorId = session?.id || "44444444-4444-4444-4444-444444444401";
-      const authorName = session?.name || "Member";
-      const authorHandle = session?.handle;
-      const authorAvatar = session?.avatar;
+      let authorId = session?.id;
+      let authorName = session?.name;
+      let authorHandle = session?.handle;
+      let authorAvatar = session?.avatar;
+
+      // Query Supabase auth directly to guarantee correct authenticated author ID
+      try {
+        const { data: authUser } = await supabase.auth.getUser();
+        if (authUser?.user) {
+          authorId = authUser.user.id;
+          if (!authorName || authorName === "Member") {
+            authorName =
+              authUser.user.user_metadata?.["display_name"] ||
+              authUser.user.user_metadata?.["username"] ||
+              authUser.user.email?.split("@")[0] ||
+              "Member";
+          }
+          authorHandle = authUser.user.user_metadata?.["username"] || authorHandle;
+          authorAvatar = authUser.user.user_metadata?.["avatar_url"] || authorAvatar;
+        }
+      } catch {}
+
+      if (!authorId) {
+        authorId = "44444444-4444-4444-4444-444444444401";
+      }
+      if (!authorName) {
+        authorName = "Member";
+      }
       const newPostcardId = crypto.randomUUID();
 
       const res = await submitPostcard({
@@ -678,7 +703,7 @@ function Capture() {
         <div className="space-y-4 border-t border-sand p-4 md:border-t-0 md:border-l">
           <div className="flex items-center gap-2">
             <Avatar src={session?.avatar || (session?.name ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.name)}` : ME.avatar)} size="size-7" />
-            <span className="text-sm font-semibold text-ink">{session?.handle || ME.handle}</span>
+            <span className="text-sm font-semibold text-ink">{session?.handle || (session?.name ? `@${session.name.toLowerCase().replace(/\s+/g, "")}` : ME.handle)}</span>
           </div>
 
           <div>

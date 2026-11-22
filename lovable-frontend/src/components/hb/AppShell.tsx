@@ -19,7 +19,7 @@ export function HoursChip() {
     </Link>
   );
 }
-export function Avatar({ src, size = "size-8", ring, className }: { src: string; size?: string; ring?: "story" | "seen"; className?: string }) {
+export function Avatar({ src, size = "size-8", ring, className }: { src: string; size?: string | undefined; ring?: "story" | "seen" | undefined; className?: string | undefined }) {
   const img = <img src={src} alt="" className={cn("rounded-full bg-line object-cover", size, ring && "border-2 border-paper-raised")} />;
   if (!ring) return <span className={cn("inline-flex shrink-0", className)}>{img}</span>;
   return <span className={cn("inline-flex shrink-0 rounded-full p-[2px]", ring === "story" ? "story-ring" : "seen-ring", className)}>{img}</span>;
@@ -75,14 +75,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         document.documentElement.classList.remove("chat-route-active");
         document.body.classList.remove("chat-route-active");
       };
+    } else {
+      document.documentElement.classList.remove("chat-route-active");
+      document.body.classList.remove("chat-route-active");
+      return undefined;
     }
   }, [path]);
 
   const unread = chats.filter((c) => c.messages.some((m) => !m.mine)).length;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
   const on = (to: string) => panel === null && (to === "/" ? path === "/" : path.startsWith(to));
-  const isRewardsActive = on("/passport") && (search?.tab === "rewards" || (!search?.tab && !path.startsWith("/passport/")));
-  const isPassportActive = on("/passport") && search?.tab === "stamps";
+  const currentTab = search ? (search as Record<string, any>)["tab"] : undefined;
+  const isRewardsActive = on("/passport") && (currentTab === "rewards" || (!currentTab && !path.startsWith("/passport/")));
+  const isPassportActive = on("/passport") && currentTab === "stamps";
   const collapsed = panel !== null;
 
   const item = (label: string, icon: ReactNode, active: boolean, extra?: ReactNode) => (
