@@ -78,7 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Left: Brand Logo & Hours reclaimed */}
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2.5 transition-transform hover:scale-[1.02] active:scale-95" aria-label="Outstagram Home">
-            <OutstagramIcon size={30} />
+            <OutstagramIcon size={34} />
             <Wordmark className="text-2xl md:text-3xl text-ink" />
           </Link>
           <div className="hidden lg:block ml-2">
@@ -200,7 +200,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         demo ? "top-20" : "top-14 md:top-16",
         collapsed && "xl:w-[72px]"
       )}>
-        <nav className="flex flex-1 flex-col gap-1 pt-4" aria-label="Main">
+        <div className="hidden xl:flex items-center gap-2.5 px-3 py-2 border-b border-sand/40 mb-2">
+          <OutstagramIcon size={26} />
+          <Wordmark className="text-xl text-ink" />
+        </div>
+        <nav className="flex flex-1 flex-col gap-1 pt-2" aria-label="Main">
           <Link to="/" className="group" onClick={() => setPanel(null)}>{item("Home", <Home className={cn("size-6", on("/") && "fill-ink")} />, on("/"))}</Link>
           <Link to="/rack" className="group" onClick={() => setPanel(null)}>{item("Rack", <Clapperboard className="size-6" />, on("/rack"))}</Link>
           <Link to="/chats" className="group" onClick={() => setPanel(null)}>{item("Messages", <Send className="size-6" />, on("/chats"), badge)}</Link>
