@@ -63,7 +63,32 @@ function Today() {
             <div className="py-6 text-center text-sm text-ink-muted">No postcards shared yet today. Be the first to share one!</div>
           ) : (
             <div className="mt-4 flex -space-x-4 sm:-space-x-6 overflow-hidden py-1">
-              {activeRack.slice(0, 5).map((c, i) => <img key={c.id} src={c.img} alt={c.place} loading="lazy" className={cn("aspect-[3/2] w-20 sm:w-24 shrink-0 rounded-sm border-2 sm:border-4 border-paper-raised object-cover shadow-paper", i % 2 ? "rotate-2" : "-rotate-2")} />)}
+              {activeRack.slice(0, 5).map((c, i) => {
+                const isVid = c.img.startsWith("data:video") || c.img.endsWith(".mp4") || c.img.endsWith(".webm");
+                return isVid ? (
+                  <video
+                    key={c.id}
+                    src={c.img}
+                    muted
+                    playsInline
+                    className={cn(
+                      "aspect-[3/2] w-20 sm:w-24 shrink-0 rounded-sm border-2 sm:border-4 border-paper-raised object-cover shadow-paper",
+                      i % 2 ? "rotate-2" : "-rotate-2"
+                    )}
+                  />
+                ) : (
+                  <img
+                    key={c.id}
+                    src={c.img}
+                    alt={c.place}
+                    loading="lazy"
+                    className={cn(
+                      "aspect-[3/2] w-20 sm:w-24 shrink-0 rounded-sm border-2 sm:border-4 border-paper-raised object-cover shadow-paper",
+                      i % 2 ? "rotate-2" : "-rotate-2"
+                    )}
+                  />
+                );
+              })}
             </div>
           )}
           <p className="mt-4 text-sm text-ink-muted">{left ? "Finite postcards from friends nearby, sideways, then it ends." : "You've seen everything. Go outside."}</p>
