@@ -764,8 +764,8 @@ function Login() {
                 <CheckCircle2 className="size-6" />
               </div>
               <h3 className="font-serif text-xl font-bold text-ink text-center">Enter Confirmation Code</h3>
-              <p className="mt-2 text-xs text-ink-muted text-center">
-                We've sent a 6-digit confirmation code (OTP) to <span className="font-semibold text-ink">{email}</span>.
+              <p className="mt-2 text-xs text-ink-muted text-center leading-relaxed">
+                We've sent a 6-digit code and confirmation link from <span className="font-semibold text-stamp-ink">outstagram@gmail.com</span> to <span className="font-semibold text-ink">{email}</span>.
               </p>
 
               <form onSubmit={handleVerifyOtp} className="mt-5 space-y-4">
