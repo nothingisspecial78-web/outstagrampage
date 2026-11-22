@@ -197,21 +197,37 @@
 
 /* Anti-Screenshot, Screen Capture & Print Protection */
 @media print {
-  html, body {
+  html, body, #root, * {
     display: none !important;
     visibility: hidden !important;
+    opacity: 0 !important;
   }
 }
 
 html, body {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 img, video {
-  -webkit-user-drag: none;
-  user-drag: none;
-  -webkit-touch-callout: none;
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+  -webkit-touch-callout: none !important;
+  pointer-events: auto;
+}
+
+/* Instant synchronous blackout veil on blur, visibilitychange or shortcut */
+html.outstagram-shield-locked body {
+  filter: blur(60px) brightness(0) !important;
+  background-color: #1C1917 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+html.outstagram-shield-locked #outstagram-screenshot-shield {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
