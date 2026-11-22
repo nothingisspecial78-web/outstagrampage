@@ -48,7 +48,36 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [panel, setPanel] = useState<Panel>(null);
   const [seenNotes, setSeenNotes] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const [viewportH, setViewportH] = useState<number | null>(null);
   const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => {
+      const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      setViewportH(h);
+    };
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.addEventListener("resize", update);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (path.startsWith("/chats")) {
+      document.documentElement.classList.add("chat-route-active");
+      document.body.classList.add("chat-route-active");
+      return () => {
+        document.documentElement.classList.remove("chat-route-active");
+        document.body.classList.remove("chat-route-active");
+      };
+    }
+  }, [path]);
+
   const unread = chats.filter((c) => c.messages.some((m) => !m.mine)).length;
   const toggle = (p: Panel) => { setPanel((c) => (c === p ? null : p)); if (p === "notifications") setSeenNotes(true); };
   const on = (to: string) => panel === null && (to === "/" ? path === "/" : path.startsWith(to));
@@ -420,16 +449,28 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <main className={cn(
-        "w-full max-w-full overflow-x-hidden pt-14 md:pt-16 md:pl-[72px] xl:pl-[244px]",
+        "w-full max-w-full overflow-x-hidden md:pl-[72px] xl:pl-[244px]",
+        demo ? "pt-20 md:pt-22" : "pt-14 md:pt-16",
         collapsed && "xl:pl-[72px]"
       )}>
         {path.startsWith("/chats") ? (
-          <div className={cn(
-            "w-full overflow-hidden",
-            path.match(/^\/chats\/[^/]+/)
-              ? "h-[calc(100dvh-3.5rem)] md:h-[calc(100dvh-4rem)]"
-              : "h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-4rem)]"
-          )}>
+          <div
+            style={
+              viewportH
+                ? {
+                    height: `${viewportH - (demo ? (typeof window !== "undefined" && window.innerWidth < 768 ? 80 : 88) : (typeof window !== "undefined" && window.innerWidth < 768 ? 56 : 64)) - (Boolean(path.match(/^\/chats\/[^/]+/)) || (typeof window !== "undefined" && window.innerWidth >= 768) ? 0 : 48)}px`,
+                  }
+                : undefined
+            }
+            className={cn(
+              "w-full overflow-hidden",
+              !viewportH && (
+                path.match(/^\/chats\/[^/]+/)
+                  ? "h-[calc(100dvh-3.5rem)] md:h-[calc(100dvh-4rem)]"
+                  : "h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-4rem)]"
+              )
+            )}
+          >
             {children}
           </div>
         ) : (

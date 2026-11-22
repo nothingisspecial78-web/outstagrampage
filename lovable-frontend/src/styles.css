@@ -222,3 +222,11 @@ img, video {
   -webkit-touch-callout: none !important;
   pointer-events: auto;
 }
+
+/* Pinned chat container - prevents window scrolling on mobile when keyboard opens */
+html.chat-route-active,
+body.chat-route-active {
+  overflow: hidden !important;
+  height: 100% !important;
+  overscroll-behavior: none !important;
+}

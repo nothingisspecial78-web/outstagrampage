@@ -33,6 +33,8 @@ export type Msg = {
     status: "completed" | "missed" | "declined";
     duration?: number;
   };
+  clientMsgId?: string;
+  createdAt?: number;
 };
 export type Chat = { id: string; peerId?: string; peerAvatar?: string; name: string; place: string; limit: number; messages: Msg[] };
 export type Craft = { id: string; title: string; mediums: string[]; notes: string; date: string };
@@ -84,6 +86,10 @@ const Ctx = g.__osStoreCtx ?? (g.__osStoreCtx = createContext<Store | null>(null
 function today() {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit" }).toUpperCase();
 }
+
+const sentMsgIds = new Set<string>();
+const receivedMsgIds = new Set<string>();
+let lastSendTrack = { text: "", time: 0 };
 
 function useStoreState() {
   const [hours, setHours] = useState(12.5);
@@ -369,7 +375,17 @@ function useStoreState() {
         const row = payload.new;
         if (!row) return;
 
-        if (row.sender_id === myId || (myEmail && row.sender_id === myEmail)) return;
+        const clientMsgId = row.client_msg_id;
+        // Ignore if sent by myself or already present in sentMsgIds
+        if (clientMsgId && sentMsgIds.has(clientMsgId)) return;
+        if (
+          row.sender_id === myId ||
+          (myEmail && row.sender_id === myEmail) ||
+          (myName && row.sender_name?.toLowerCase() === myName)
+        ) {
+          if (clientMsgId) sentMsgIds.add(clientMsgId);
+          return;
+        }
 
         const recId = (row.receiver_id || "").toLowerCase();
         const recName = (row.receiver_name || "").toLowerCase();
@@ -380,13 +396,19 @@ function useStoreState() {
 
         if (!isForMe) return;
 
+        const effectiveId = clientMsgId || row.id;
+        if (receivedMsgIds.has(effectiveId)) return;
+        receivedMsgIds.add(effectiveId);
+
         const incomingMsg: Msg = {
-          id: row.id,
+          id: effectiveId,
+          clientMsgId,
           mine: false,
           text: row.body || "",
           audioUrl: row.audio_url,
           audioDuration: row.audio_duration,
           postcard: row.postcard,
+          createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
         };
 
         const peerId = row.sender_id;
@@ -397,11 +419,19 @@ function useStoreState() {
             (c) => c.peerId === peerId || c.name.toLowerCase() === peerName.toLowerCase() || c.id === peerId
           );
           if (existing) {
+            const alreadyIn = existing.messages.some(
+              (m) =>
+                m.id === incomingMsg.id ||
+                (clientMsgId && (m.id === clientMsgId || m.clientMsgId === clientMsgId)) ||
+                (!m.mine && m.text === incomingMsg.text && Math.abs((m.createdAt || 0) - incomingMsg.createdAt!) < 6000)
+            );
+            if (alreadyIn) return prev;
+
             return prev.map((c) =>
               c.id === existing.id
                 ? {
                     ...c,
-                    messages: [...c.messages.filter((m) => m.id !== incomingMsg.id), incomingMsg],
+                    messages: [...c.messages, incomingMsg],
                     peerAvatar: row.sender_avatar || c.peerAvatar,
                   }
                 : c
@@ -444,15 +474,22 @@ function useStoreState() {
 
       ch.on("broadcast", { event: "new_chat_msg" }, ({ payload }: any) => {
         if (!payload || !payload.senderId) return;
+        const clientMsgId = payload.clientMsgId || payload.msgId;
+        if (clientMsgId && (sentMsgIds.has(clientMsgId) || receivedMsgIds.has(clientMsgId))) return;
         if (payload.senderId === session?.id || payload.senderId === session?.email) return;
 
+        const effectiveId = clientMsgId || `m_in_${Date.now()}`;
+        receivedMsgIds.add(effectiveId);
+
         const incomingMsg: Msg = {
-          id: payload.msgId || `m_in_${Date.now()}`,
+          id: effectiveId,
+          clientMsgId,
           mine: false,
           text: payload.text || "",
           audioUrl: payload.audioUrl,
           audioDuration: payload.audioDuration,
           postcard: payload.postcard,
+          createdAt: Date.now(),
         };
 
         const peerChatId = payload.chatId || payload.senderId;
@@ -463,11 +500,19 @@ function useStoreState() {
             (c) => c.id === peerChatId || c.peerId === payload.senderId || c.name.toLowerCase() === peerName.toLowerCase()
           );
           if (existing) {
+            const alreadyIn = existing.messages.some(
+              (m) =>
+                m.id === incomingMsg.id ||
+                (clientMsgId && (m.id === clientMsgId || m.clientMsgId === clientMsgId)) ||
+                (!m.mine && m.text === incomingMsg.text && Math.abs((m.createdAt || 0) - incomingMsg.createdAt!) < 6000)
+            );
+            if (alreadyIn) return prev;
+
             return prev.map((c) =>
               c.id === existing.id
                 ? {
                     ...c,
-                    messages: [...c.messages.filter((m) => m.id !== incomingMsg.id), incomingMsg],
+                    messages: [...c.messages, incomingMsg],
                     peerAvatar: payload.senderAvatar || c.peerAvatar,
                   }
                 : c
@@ -631,11 +676,35 @@ function useStoreState() {
   };
 
   const sendMsg = (chatId: string, text: string) => {
-    const msgId = `m_${Date.now()}`;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // Rapid double-click / double-enter debounce guard
+    const now = Date.now();
+    if (trimmed === lastSendTrack.text && now - lastSendTrack.time < 500) {
+      return;
+    }
+    lastSendTrack = { text: trimmed, time: now };
+
+    const clientMsgId = `m_${now}_${Math.random().toString(36).slice(2, 7)}`;
+    sentMsgIds.add(clientMsgId);
+
     setChats((cs) =>
       cs.map((c) =>
         c.id === chatId
-          ? { ...c, messages: [...c.messages, { id: msgId, mine: true, text }] }
+          ? {
+              ...c,
+              messages: [
+                ...c.messages.filter((m) => m.id !== clientMsgId && (m as any).clientMsgId !== clientMsgId),
+                {
+                  id: clientMsgId,
+                  clientMsgId,
+                  mine: true,
+                  text: trimmed,
+                  createdAt: now,
+                },
+              ],
+            }
           : c
       )
     );
@@ -653,7 +722,8 @@ function useStoreState() {
         sender_avatar: session?.avatar,
         receiver_id: targetReceiverId,
         receiver_name: targetReceiverName,
-        body: text,
+        body: trimmed,
+        client_msg_id: clientMsgId,
       })
       .then(({ error }: any) => {
         if (error) console.warn("direct_messages insert error:", error);
@@ -670,11 +740,12 @@ function useStoreState() {
             event: "new_chat_msg",
             payload: {
               chatId,
-              msgId,
+              msgId: clientMsgId,
+              clientMsgId,
               senderId: session?.id || session?.email || "self",
               senderName: session?.name || "Friend",
               senderAvatar: session?.avatar,
-              text,
+              text: trimmed,
             },
           });
           setTimeout(() => {
@@ -690,20 +761,25 @@ function useStoreState() {
   };
 
   const sendVoice = (chatId: string, audioUrl: string, duration: number) => {
-    const msgId = `m_voice_${Date.now()}`;
+    const now = Date.now();
+    const clientMsgId = `m_voice_${now}_${Math.random().toString(36).slice(2, 7)}`;
+    sentMsgIds.add(clientMsgId);
+
     setChats((cs) =>
       cs.map((c) =>
         c.id === chatId
           ? {
               ...c,
               messages: [
-                ...c.messages,
+                ...c.messages.filter((m) => m.id !== clientMsgId && (m as any).clientMsgId !== clientMsgId),
                 {
-                  id: msgId,
+                  id: clientMsgId,
+                  clientMsgId,
                   mine: true,
                   text: "Voice message",
                   audioUrl,
                   audioDuration: duration,
+                  createdAt: now,
                 },
               ],
             }
@@ -727,6 +803,7 @@ function useStoreState() {
         body: "Voice message",
         audio_url: audioUrl,
         audio_duration: duration,
+        client_msg_id: clientMsgId,
       })
       .then(({ error }: any) => {
         if (error) console.warn("direct_messages voice insert error:", error);
@@ -743,11 +820,12 @@ function useStoreState() {
             event: "new_chat_msg",
             payload: {
               chatId,
-              msgId,
+              msgId: clientMsgId,
+              clientMsgId,
               senderId: session?.id || session?.email || "self",
               senderName: session?.name || "Friend",
               senderAvatar: session?.avatar,
-              text,
+              text: "Voice message",
               audioUrl,
               audioDuration: duration,
             },

@@ -152,20 +152,20 @@ function ThreadList({ selected }: { selected: string | undefined }) {
   return (
     <aside
       className={cn(
-        "w-full border-r border-sand bg-paper-raised md:w-[360px] md:shrink-0",
-        selected && "hidden md:block"
+        "w-full h-full flex flex-col border-r border-sand bg-paper-raised md:w-[320px] lg:w-[360px] md:shrink-0 overflow-hidden",
+        selected && "hidden md:flex"
       )}
     >
-      <div className="border-b border-sand px-5 pt-6 pb-4">
-        <div className="mb-5 flex items-center justify-between">
-          <button className="flex items-center gap-1 text-xl font-bold text-ink">
+      <div className="shrink-0 border-b border-sand px-4 sm:px-5 pt-4 sm:pt-6 pb-3 sm:pb-4">
+        <div className="mb-4 sm:mb-5 flex items-center justify-between">
+          <button className="flex items-center gap-1 text-lg sm:text-xl font-bold text-ink">
             {handle}
             <ChevronDown className="size-4" />
           </button>
           <button
             aria-label="New message"
             onClick={() => setPicker(true)}
-            className="rounded-full p-2 text-ink hover:bg-line"
+            className="rounded-full p-2 text-ink hover:bg-line transition-colors cursor-pointer"
           >
             <Pencil className="size-5" />
           </button>
@@ -176,15 +176,15 @@ function ThreadList({ selected }: { selected: string | undefined }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, code or handle"
-            className="h-9 rounded-lg border-0 bg-line pl-9 shadow-none"
+            className="h-9 rounded-lg border-0 bg-line pl-9 shadow-none text-sm"
           />
         </label>
-        <div className="mt-5 flex items-center justify-between">
+        <div className="mt-4 sm:mt-5 flex items-center justify-between">
           <b className="text-sm text-ink">Messages</b>
           <span className="text-xs font-medium text-ink-muted">Requests</span>
         </div>
       </div>
-      <div className="py-1">
+      <div className="flex-1 overflow-y-auto py-1 overscroll-contain">
         {filtered.map((c) => (
           <Thread key={c.id} chat={c} active={selected === c.id} />
         ))}
@@ -258,26 +258,26 @@ function Conversation({ chat }: { chat: Chat }) {
   };
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-paper-raised">
-      <header className="flex h-[68px] shrink-0 items-center gap-3 border-b border-sand px-4">
-        <Link to="/chats" className="md:hidden" aria-label="Back to messages">
+    <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-paper-raised overflow-hidden">
+      <header className="flex h-14 md:h-16 shrink-0 items-center gap-2.5 sm:gap-3 border-b border-sand px-3 sm:px-4 bg-paper-raised/95 backdrop-blur-xs z-10 select-none">
+        <Link to="/chats" className="md:hidden flex items-center justify-center size-9 rounded-full text-ink hover:bg-sand/30 transition-colors" aria-label="Back to messages">
           <ArrowLeft className="size-5" />
         </Link>
-        <Face name={chat.name} avatar={chat.peerAvatar} size="size-10" />
+        <Face name={chat.name} avatar={chat.peerAvatar} size="size-9 sm:size-10" />
         <div className="min-w-0 flex-1">
-          <b className="block truncate text-sm text-ink">{chat.name}</b>
-          <small className="text-xs text-ink-muted">Active now</small>
+          <b className="block truncate text-sm font-semibold text-ink">{chat.name}</b>
+          <small className="text-[11px] text-ink-muted">Active now</small>
         </div>
-        <div className="flex items-center gap-1 text-ink">
+        <div className="flex items-center gap-0.5 sm:gap-1 text-ink">
           {/* Voice Call Button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => initiateCall("voice")}
             aria-label={`Voice call ${chat.name}`}
-            className="hover:bg-sand/30 hover:text-stamp-ink"
+            className="size-8 sm:size-9 hover:bg-sand/30 hover:text-stamp-ink"
           >
-            <Phone className="size-5" />
+            <Phone className="size-4 sm:size-5" />
           </Button>
 
           {/* Video Call Button */}
@@ -286,19 +286,19 @@ function Conversation({ chat }: { chat: Chat }) {
             size="icon"
             onClick={() => initiateCall("video")}
             aria-label={`Video call ${chat.name}`}
-            className="hover:bg-sand/30 hover:text-stamp-ink"
+            className="size-8 sm:size-9 hover:bg-sand/30 hover:text-stamp-ink"
           >
-            <Video className="size-5" />
+            <Video className="size-4 sm:size-5" />
           </Button>
 
-          <Button variant="ghost" size="icon" aria-label="Conversation info">
-            <Info className="size-5" />
+          <Button variant="ghost" size="icon" aria-label="Conversation info" className="size-8 sm:size-9 hover:bg-sand/30">
+            <Info className="size-4 sm:size-5" />
           </Button>
         </div>
       </header>
 
       {/* Message List */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-5 md:px-8">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 sm:px-6 py-4 overscroll-contain">
         {chat.messages.length > 3 && (
           <div className="py-3 text-center">
             <span className="rounded-full bg-line px-3 py-1 text-xs text-ink-muted">Today</span>
@@ -392,7 +392,7 @@ function Conversation({ chat }: { chat: Chat }) {
       </div>
 
       {/* Input Bar / Envelope Lock */}
-      <div className="shrink-0 border-t border-sand p-3 md:px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-paper-raised">
+      <div className="shrink-0 border-t border-sand p-2 sm:p-3 md:px-5 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-paper-raised">
         {locked ? (
           <div className="mx-auto max-w-lg">
             <div className="mb-3 flex justify-center">
@@ -412,7 +412,7 @@ function Conversation({ chat }: { chat: Chat }) {
           </div>
         ) : (
           <form
-            className="flex items-center gap-2 rounded-full border border-sand px-3 py-1.5 bg-paper"
+            className="flex items-center gap-1.5 sm:gap-2 rounded-full border border-sand px-3 py-1 bg-paper shadow-xs focus-within:border-stamp focus-within:shadow-[0_0_0_2px_var(--stamp-soft)]"
             onSubmit={(e) => {
               e.preventDefault();
               if (text.trim()) {
@@ -421,16 +421,16 @@ function Conversation({ chat }: { chat: Chat }) {
               }
             }}
           >
-            <button type="button" aria-label="Emoji" className="text-ink hover:text-stamp-ink">
+            <button type="button" aria-label="Emoji" className="text-ink hover:text-stamp-ink cursor-pointer">
               <Smile className="size-5" />
             </button>
             <Input
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Message…"
-              className="h-9 border-0 bg-transparent shadow-none focus-visible:ring-0"
+              className="h-9 border-0 bg-transparent shadow-none focus-visible:ring-0 text-sm"
             />
-            <button type="button" aria-label="Add image" className="text-ink hover:text-stamp-ink">
+            <button type="button" aria-label="Add image" className="text-ink hover:text-stamp-ink cursor-pointer">
               <ImageIcon className="size-5" />
             </button>
 
@@ -442,14 +442,14 @@ function Conversation({ chat }: { chat: Chat }) {
             />
 
             {text.trim() ? (
-              <button type="submit" className="px-1 text-sm font-semibold text-link">
+              <button type="submit" className="px-1.5 text-sm font-semibold text-link cursor-pointer">
                 Send
               </button>
             ) : (
               <button
                 type="button"
                 aria-label="Send a heart"
-                className="text-ink hover:text-rose-500"
+                className="text-ink hover:text-rose-500 cursor-pointer"
                 onClick={() => send(chat.id, "❤️")}
               >
                 <Heart className="size-5" />
@@ -481,7 +481,7 @@ export function Inbox({ chatId }: { chatId?: string }) {
     );
 
   return (
-    <div className="flex size-full overflow-hidden bg-paper-raised">
+    <div className="flex size-full h-full overflow-hidden bg-paper-raised">
       <ThreadList selected={chatId} />
       {chat ? (
         <Conversation chat={chat} />
