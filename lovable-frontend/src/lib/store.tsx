@@ -649,30 +649,69 @@ function useStoreState() {
       // 1. Ensure author's profile exists
       await ensureProfileExists(authorId, pc.from, pc.handle, pc.avatar);
 
-      // 2. Upload media to Supabase storage if it's still base64 data
+      // 2. Check if author already has a post today to respect one_postcard_per_day
+      const todayUtc = new Date().toISOString().slice(0, 10);
+      const { data: existingToday } = await supabase
+        .from("postcards")
+        .select("id")
+        .eq("author_id", authorId)
+        .gte("taken_at", `${todayUtc}T00:00:00.000Z`)
+        .order("taken_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const finalPostcardId = existingToday?.id || pc.id;
+
+      // 3. Upload media to Supabase storage if it's still base64 data
       let mediaUrl = pc.img;
       if (mediaUrl.startsWith("data:")) {
-        mediaUrl = await uploadPostcardMedia(mediaUrl, authorId, pc.id);
+        mediaUrl = await uploadPostcardMedia(mediaUrl, authorId, finalPostcardId);
       }
 
-      // 3. Upsert to Supabase postcards table
+      // 4. Upsert to Supabase postcards table
       const { error: pcError } = await supabase.from("postcards").upsert({
-        id: pc.id,
+        id: finalPostcardId,
         author_id: authorId,
         place_id: placeId,
         image_path: mediaUrl,
         caption: pc.caption,
         is_demo: Boolean(pc.isDemo),
+        taken_at: new Date().toISOString(),
       });
 
       if (pcError) {
         console.warn("Could not save postcard to Supabase:", pcError);
+        if (pcError.code === "23505" || pcError.message?.includes("one_postcard_per_day")) {
+          const { data: latestRow } = await supabase
+            .from("postcards")
+            .select("id")
+            .eq("author_id", authorId)
+            .order("taken_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestRow?.id) {
+            await supabase
+              .from("postcards")
+              .update({
+                place_id: placeId,
+                image_path: mediaUrl,
+                caption: pc.caption,
+                taken_at: new Date().toISOString(),
+              })
+              .eq("id", latestRow.id);
+          }
+        }
       }
 
-      // Update local card with permanent media URL if it was uploaded
-      if (mediaUrl !== pc.img) {
-        setRack((r) => r.map((item) => (item.id === pc.id ? { ...item, img: mediaUrl } : item)));
-      }
+      // Update local card with permanent media URL & final ID
+      setRack((r) =>
+        r.map((item) =>
+          item.id === pc.id || item.id === finalPostcardId
+            ? { ...item, id: finalPostcardId, img: mediaUrl }
+            : item
+        )
+      );
 
       // 4. Save stamp in database
       try {

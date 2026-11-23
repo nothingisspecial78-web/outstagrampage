@@ -500,7 +500,6 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
   error?: string;
 }> {
   try {
-    const postcardId = crypto.randomUUID();
     const { data: authData } = await supabase.auth.getUser();
     const authorId = payload.author_id || authData?.user?.id || '44444444-4444-4444-4444-444444444401';
     const placeId = resolvePlaceId(payload.place_id);
@@ -508,10 +507,23 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
     // 1. Ensure author's profile row exists before inserting postcard
     await ensureProfileExists(authorId, payload.author_name);
 
-    // 2. Upload photo/video to Supabase storage to get a permanent public URL
+    // 2. Check if author already posted today to respect the one_postcard_per_day constraint
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const { data: existingToday } = await supabase
+      .from('postcards')
+      .select('id')
+      .eq('author_id', authorId)
+      .gte('taken_at', `${todayUtc}T00:00:00.000Z`)
+      .order('taken_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const postcardId = existingToday?.id || crypto.randomUUID();
+
+    // 3. Upload photo/video to Supabase storage to get a permanent public URL
     const mediaUrl = await uploadPostcardMedia(payload.image_base64, authorId, postcardId);
 
-    // 3. Upsert postcard directly into postcards table
+    // 4. Upsert postcard directly into postcards table
     const { error: pcError } = await supabase.from('postcards').upsert({
       id: postcardId,
       author_id: authorId,
@@ -519,13 +531,36 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
       image_path: mediaUrl,
       caption: payload.caption,
       is_demo: Boolean(payload.demo_mode),
+      taken_at: new Date().toISOString(),
     });
 
     if (pcError) {
-      console.error('[API] Postcard upsert error:', pcError);
+      console.warn('[API] Postcard upsert note:', pcError);
+      // Fallback: If one_postcard_per_day conflict occurred, update the latest row for this author
+      if (pcError.code === '23505' || pcError.message?.includes('one_postcard_per_day')) {
+        const { data: latestRow } = await supabase
+          .from('postcards')
+          .select('id')
+          .eq('author_id', authorId)
+          .order('taken_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestRow?.id) {
+          await supabase
+            .from('postcards')
+            .update({
+              place_id: placeId,
+              image_path: mediaUrl,
+              caption: payload.caption,
+              taken_at: new Date().toISOString(),
+            })
+            .eq('id', latestRow.id);
+        }
+      }
     }
 
-    // 4. Record place stamp in stamps table
+    // 5. Record place stamp in stamps table
     try {
       await supabase.from('stamps').insert({
         id: crypto.randomUUID(),
