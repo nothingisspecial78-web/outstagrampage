@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, ArrowLeft, Check, UserPlus, Camera, RefreshCw, Square, RotateCcw, Loader2 } from "lucide-react";
+import { MapPin, ArrowLeft, Check, UserPlus, Camera, RefreshCw, Square, RotateCcw, Loader2, Clapperboard, Home } from "lucide-react";
 import { toast } from "sonner";
 import { CharCount, Avatar } from "@/components/hb/AppShell";
 import { Postmark } from "@/components/hb/Postmark";
@@ -430,6 +430,7 @@ function Capture() {
       });
 
       const finalId = res.postcard_id || newPostcardId;
+      const finalImg = res.postcard?.img || capturedPhoto;
 
       addPostcard({
         id: finalId,
@@ -439,7 +440,7 @@ function Capture() {
         authorId: authorId,
         place,
         date: "TODAY",
-        img: capturedPhoto,
+        img: finalImg,
         caption: caption.trim(),
       });
 
@@ -624,11 +625,14 @@ function Capture() {
         <p className="mt-1 text-sm text-ink-muted">
           That's your one post for today. Now enjoy {place}.
         </p>
-        <div className="mt-6 flex justify-center gap-2">
-          <Link to="/" className="rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-stamp-ink transition-colors">
-            Back to feed
+        <div className="mt-6 flex flex-col sm:flex-row justify-center gap-2">
+          <Link to="/rack" className="rounded-xl bg-stamp px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-stamp-ink transition-colors flex items-center justify-center gap-1.5 shadow-sm">
+            <Clapperboard className="size-4" /> View in Today's Rack
           </Link>
-          <Link to="/passport" className="rounded-xl bg-line px-4 py-2.5 text-sm font-semibold text-ink hover:bg-sand transition-colors">
+          <Link to="/" className="rounded-xl bg-line px-4 py-2.5 text-sm font-semibold text-ink hover:bg-sand transition-colors flex items-center justify-center gap-1.5">
+            <Home className="size-4" /> Home Feed
+          </Link>
+          <Link to="/passport" className="rounded-xl border border-sand px-4 py-2.5 text-sm font-semibold text-ink hover:bg-line transition-colors flex items-center justify-center gap-1.5">
             See stamp
           </Link>
         </div>

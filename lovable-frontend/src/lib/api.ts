@@ -377,8 +377,114 @@ export function syncCoachRemaining(remaining: number): void {
   } catch {}
 }
 
+export const PLACE_NAME_TO_ID: Record<string, string> = {
+  "Riverside Cafe": "22222222-2222-2222-2222-222222222211",
+  "West Pier": "22222222-2222-2222-2222-222222222212",
+  "Linden Park": "22222222-2222-2222-2222-222222222213",
+  "Remparts Books": "22222222-2222-2222-2222-222222222214",
+  "Riverside Artisan Cafe": "22222222-2222-2222-2222-222222222201",
+  "City Central Library": "22222222-2222-2222-2222-222222222202",
+  "Sunset Point Hill": "22222222-2222-2222-2222-222222222203",
+  "Demo Spot (Venue simulated)": "22222222-2222-2222-2222-222222222204",
+};
+
+export function resolvePlaceId(placeNameOrId?: string): string {
+  if (!placeNameOrId) return "22222222-2222-2222-2222-222222222211";
+  if (PLACE_NAME_TO_ID[placeNameOrId]) return PLACE_NAME_TO_ID[placeNameOrId];
+  if (placeNameOrId.length === 36 && placeNameOrId.includes("-")) return placeNameOrId;
+  return "22222222-2222-2222-2222-222222222211";
+}
+
+export async function ensureProfileExists(
+  authorId: string,
+  authorName?: string,
+  authorHandle?: string,
+  authorAvatar?: string
+): Promise<void> {
+  if (!authorId) return;
+  try {
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', authorId)
+      .maybeSingle();
+
+    if (!existing) {
+      const cleanName = authorName || "Community Member";
+      const cleanHandle = authorHandle || cleanName.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20) || `user_${authorId.slice(0, 6)}`;
+      const cleanAvatar = authorAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`;
+
+      await supabase.from('profiles').upsert({
+        id: authorId,
+        display_name: cleanName,
+        username: cleanHandle,
+        avatar_url: cleanAvatar,
+        friend_code: cleanHandle.toUpperCase(),
+      });
+    }
+  } catch (err) {
+    console.warn('[Profile] Ensure profile warning:', err);
+  }
+}
+
 /**
- * Submit a live postcard to the backend API and Supabase
+ * Upload postcard media (base64 or blob) to Supabase Storage 'postcards' bucket.
+ * Returns public URL for permanent streaming & feed sharing.
+ */
+export async function uploadPostcardMedia(
+  dataUriOrUrl: string,
+  authorId: string,
+  postcardId: string
+): Promise<string> {
+  if (!dataUriOrUrl || !dataUriOrUrl.startsWith("data:")) {
+    return dataUriOrUrl;
+  }
+
+  try {
+    const [header, base64Data] = dataUriOrUrl.split(",");
+    if (!base64Data) return dataUriOrUrl;
+
+    const mimeMatch = header.match(/:(.*?);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const ext = mimeType.includes("video")
+      ? mimeType.includes("mp4") ? "mp4" : "webm"
+      : mimeType.includes("png") ? "png" : "jpg";
+
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: mimeType });
+
+    const filePath = `${authorId}/${postcardId}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("postcards")
+      .upload(filePath, blob, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (!uploadError) {
+      const { data: publicUrlData } = supabase.storage
+        .from("postcards")
+        .getPublicUrl(filePath);
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    } else {
+      console.warn("[MediaUpload] Storage upload warning, using original data URI:", uploadError);
+    }
+  } catch (err) {
+    console.warn("[MediaUpload] Failed converting media for storage:", err);
+  }
+
+  return dataUriOrUrl;
+}
+
+/**
+ * Submit a live postcard to Supabase and community feed
  */
 export async function submitPostcard(payload: PostcardPayload): Promise<{
   success: boolean;
@@ -394,69 +500,56 @@ export async function submitPostcard(payload: PostcardPayload): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch(`${API_BASE}/postcard/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+    const postcardId = crypto.randomUUID();
+    const { data: authData } = await supabase.auth.getUser();
+    const authorId = payload.author_id || authData?.user?.id || '44444444-4444-4444-4444-444444444401';
+    const placeId = resolvePlaceId(payload.place_id);
+
+    // 1. Ensure author's profile row exists before inserting postcard
+    await ensureProfileExists(authorId, payload.author_name);
+
+    // 2. Upload photo/video to Supabase storage to get a permanent public URL
+    const mediaUrl = await uploadPostcardMedia(payload.image_base64, authorId, postcardId);
+
+    // 3. Upsert postcard directly into postcards table
+    const { error: pcError } = await supabase.from('postcards').upsert({
+      id: postcardId,
+      author_id: authorId,
+      place_id: placeId,
+      image_path: mediaUrl,
+      caption: payload.caption,
+      is_demo: Boolean(payload.demo_mode),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.message || data.error || 'Failed to submit postcard');
+    if (pcError) {
+      console.error('[API] Postcard upsert error:', pcError);
     }
-    return data;
-  } catch (err: any) {
-    console.warn('[API] Backend unreachable or failed, using Supabase direct fallback:', err);
 
-    // Direct fallback if backend service is offline
+    // 4. Record place stamp in stamps table
     try {
-      const postcardId = crypto.randomUUID();
-      const { data: authData } = await supabase.auth.getUser();
-      const authorId = payload.author_id || authData?.user?.id || '33333333-3333-3333-3333-333333333301';
-
-      await supabase.from('postcards').upsert({
-        id: postcardId,
-        author_id: authorId,
-        place_id: '22222222-2222-2222-2222-222222222201',
-        image_path: payload.image_base64,
-        caption: payload.caption,
-        is_demo: Boolean(payload.demo_mode),
-      });
-
       await supabase.from('stamps').insert({
         id: crypto.randomUUID(),
         user_id: authorId,
         kind: 'place',
         label: payload.place_id,
       });
+    } catch {}
 
-      return {
-        success: true,
-        postcard_id: postcardId,
-        postcard: {
-          id: postcardId,
-          place: payload.place_id,
-          caption: payload.caption,
-          img: payload.image_base64,
-          date: 'TODAY',
-        },
-        message: 'Postcard saved to passport!',
-      };
-    } catch (dbErr) {
-      return {
-        success: true,
-        postcard_id: crypto.randomUUID(),
-        postcard: {
-          id: crypto.randomUUID(),
-          place: payload.place_id,
-          caption: payload.caption,
-          img: payload.image_base64,
-          date: 'TODAY',
-        },
-      };
-    }
+    return {
+      success: true,
+      postcard_id: postcardId,
+      postcard: {
+        id: postcardId,
+        place: payload.place_id,
+        caption: payload.caption,
+        img: mediaUrl,
+        date: 'TODAY',
+      },
+      message: 'Postcard shared to rack!',
+    };
+  } catch (err: any) {
+    console.error('[API] submitPostcard error:', err);
+    throw err;
   }
 }
 

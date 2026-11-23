@@ -4,7 +4,7 @@ import garden from "@/assets/pc-garden.jpg";
 import books from "@/assets/pc-books.jpg";
 import pier from "@/assets/pc-pier.jpg";
 import { supabase, fetchLiveQuests, fetchLivePlaces, fetchLiveOffers } from "./supabase";
-import { logQuestToSupabase, logCraftToSupabase } from "./api";
+import { logQuestToSupabase, logCraftToSupabase, ensureProfileExists, uploadPostcardMedia, resolvePlaceId } from "./api";
 
 export const MESSAGE_LIMIT_STEP = 20;
 
@@ -237,13 +237,13 @@ function useStoreState() {
     const postcardSubName = `public_postcards_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const postcardSub = supabase
       .channel(postcardSubName)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'postcards' }, async (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'postcards' }, async (payload: any) => {
         const row = payload.new;
-        if (!row) return;
+        if (!row || !row.id) return;
         let authorName = "Community Member";
         let handleName: string | undefined = undefined;
         let avatarUrl: string | undefined = undefined;
-        let placeName = "Riverside Artisan Cafe";
+        let placeName = "Riverside Cafe";
         try {
           if (row.author_id) {
             const { data: prof } = await supabase.from('profiles').select('username, display_name, avatar_url').eq('id', row.author_id).maybeSingle();
@@ -266,8 +266,8 @@ function useStoreState() {
           avatar: avatarUrl,
           place: placeName,
           date: 'TODAY',
-          img: row.image_path,
-          caption: row.caption,
+          img: row.image_path || cafe,
+          caption: row.caption || '',
           authorId: row.author_id,
           isDemo: Boolean(row.is_demo),
         };
@@ -638,28 +638,53 @@ function useStoreState() {
   };
 
   const addPostcard = async (pc: Postcard) => {
+    // Optimistically update local feed immediately
     setRack((r) => [pc, ...r.filter((x) => x.id !== pc.id)]);
     addStamp("place", pc.place);
 
     try {
       const authorId = pc.authorId || session?.id || "44444444-4444-4444-4444-444444444401";
-      await supabase.from("postcards").upsert({
+      const placeId = resolvePlaceId(pc.place);
+
+      // 1. Ensure author's profile exists
+      await ensureProfileExists(authorId, pc.from, pc.handle, pc.avatar);
+
+      // 2. Upload media to Supabase storage if it's still base64 data
+      let mediaUrl = pc.img;
+      if (mediaUrl.startsWith("data:")) {
+        mediaUrl = await uploadPostcardMedia(mediaUrl, authorId, pc.id);
+      }
+
+      // 3. Upsert to Supabase postcards table
+      const { error: pcError } = await supabase.from("postcards").upsert({
         id: pc.id,
         author_id: authorId,
-        place_id: "22222222-2222-2222-2222-222222222201",
-        image_path: pc.img,
+        place_id: placeId,
+        image_path: mediaUrl,
         caption: pc.caption,
-        is_demo: false,
+        is_demo: Boolean(pc.isDemo),
       });
 
-      await supabase.from("stamps").insert({
-        id: crypto.randomUUID(),
-        user_id: authorId,
-        kind: "place",
-        label: pc.place,
-      });
+      if (pcError) {
+        console.warn("Could not save postcard to Supabase:", pcError);
+      }
 
-      // Broadcast new postcard to all active community feeds
+      // Update local card with permanent media URL if it was uploaded
+      if (mediaUrl !== pc.img) {
+        setRack((r) => r.map((item) => (item.id === pc.id ? { ...item, img: mediaUrl } : item)));
+      }
+
+      // 4. Save stamp in database
+      try {
+        await supabase.from("stamps").insert({
+          id: crypto.randomUUID(),
+          user_id: authorId,
+          kind: "place",
+          label: pc.place,
+        });
+      } catch {}
+
+      // 5. Broadcast new postcard to all active community feeds
       try {
         const ch = supabase.channel("public_postcards_broadcast");
         ch.subscribe(async (status) => {
@@ -667,7 +692,7 @@ function useStoreState() {
             await ch.send({
               type: "broadcast",
               event: "new_community_postcard",
-              payload: { postcard: pc },
+              payload: { postcard: { ...pc, img: mediaUrl } },
             });
             setTimeout(() => {
               try { supabase.removeChannel(ch); } catch {}
