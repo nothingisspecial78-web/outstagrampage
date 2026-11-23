@@ -445,8 +445,14 @@ function Login() {
         });
 
         if (authError) {
-          setError(authError.message);
-          toast.error(authError.message || "Failed to create account.");
+          if (authError.message?.toLowerCase().includes("confirmation email") || (authError as any).status === 500) {
+            const helpfulMsg = "SMTP Error: Google rejected the email credentials. In Supabase Dashboard, go to Auth > Providers > Email and toggle OFF 'Confirm email' for instant signup, or update the Gmail App Password.";
+            setError(helpfulMsg);
+            toast.error(helpfulMsg, { duration: 9000 });
+          } else {
+            setError(authError.message);
+            toast.error(authError.message || "Failed to create account.");
+          }
           setBusy(false);
           return;
         }
