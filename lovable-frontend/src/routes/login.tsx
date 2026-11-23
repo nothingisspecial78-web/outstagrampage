@@ -503,7 +503,7 @@ function Login() {
     e.preventDefault();
     const token = otp.trim();
     if (token.length < 6) {
-      setError("Please enter the complete 6-digit confirmation code.");
+      setError("Please enter the complete confirmation code from your email.");
       return;
     }
     setError("");
@@ -620,7 +620,7 @@ function Login() {
       if (resendErr) {
         toast.error(resendErr.message || "Failed to resend code.");
       } else {
-        toast.success("New 6-digit confirmation code sent to " + email.trim());
+        toast.success("New confirmation code sent to " + email.trim());
       }
     } catch (err: any) {
       toast.error(err.message || "Could not resend code.");
@@ -677,7 +677,7 @@ function Login() {
             {forgotMode
               ? "Enter your registered email address to receive a secure password reset link."
               : otpMode
-              ? `Enter the 6-digit confirmation code (OTP) sent to your email.`
+              ? `Enter the confirmation code sent to your email.`
               : mode === "in"
               ? "Sign in. One quest, ten postcards, then go outside."
               : "Create an account. No likes, no followers."}
@@ -771,22 +771,22 @@ function Login() {
               </div>
               <h3 className="font-serif text-xl font-bold text-ink text-center">Enter Confirmation Code</h3>
               <p className="mt-2 text-xs text-ink-muted text-center leading-relaxed">
-                We've sent a 6-digit code and confirmation link from <span className="font-semibold text-stamp-ink">outstagram@gmail.com</span> to <span className="font-semibold text-ink">{email}</span>.
+                We've sent a confirmation code and link from <span className="font-semibold text-stamp-ink">outstagram@gmail.com</span> to <span className="font-semibold text-ink">{email}</span>.
               </p>
 
               <form onSubmit={handleVerifyOtp} className="mt-5 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-ink mb-1.5 text-center">6-Digit Code</label>
+                  <label className="block text-xs font-semibold text-ink mb-1.5 text-center">Confirmation Code (6 to 8 Digits)</label>
                   <input
                     type="text"
                     inputMode="numeric"
                     autoFocus
                     required
-                    maxLength={6}
+                    maxLength={10}
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
-                    placeholder="123456"
-                    className="h-14 w-full rounded-2xl border border-sand bg-paper text-center text-3xl font-mono font-bold tracking-[0.4em] text-ink outline-none focus:border-stamp focus:shadow-[0_0_0_4px_var(--stamp-soft)]"
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+                    placeholder="12345678"
+                    className="h-14 w-full rounded-2xl border border-sand bg-paper text-center text-2xl sm:text-3xl font-mono font-bold tracking-[0.25em] sm:tracking-[0.35em] text-ink outline-none focus:border-stamp focus:shadow-[0_0_0_4px_var(--stamp-soft)]"
                   />
                 </div>
 
